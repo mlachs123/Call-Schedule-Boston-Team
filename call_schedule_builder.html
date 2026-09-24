@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call Schedule Builder</title>
+<style>
+:root{--ink:#1d2939;--muted:#667085;--line:#e4e7ec;--bg:#f6f8fa;--accent:#0f766e;--accent-dark:#115e59;--wk:#eef4ff;--err:#b42318;--warn:#b54708;--ok:#067647}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.4}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;font-size:17px;margin-right:auto}
+.month-nav{display:flex;align-items:center;gap:6px}
+.month-label{font-weight:700;min-width:150px;text-align:center;font-size:15px}
+.file-actions{display:flex;gap:6px;flex-wrap:wrap}
+button,.btn{font:inherit;border:1px solid #d0d5dd;background:#fff;color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;display:inline-block}
+button:hover,.btn:hover{background:#f2f4f7}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:var(--accent-dark)}
+button.danger{color:var(--err);border-color:#fda29b}
+button.link{border:none;background:none;color:inherit;text-decoration:underline;padding:0 4px}
+button:disabled{opacity:.55;cursor:default}
+.status{padding:6px 20px;font-size:12px;color:var(--muted);background:#fff;border-bottom:1px solid var(--line)}
+nav.tabs{display:flex;gap:2px;padding:0 16px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px;background:none;color:var(--muted);font-weight:600}
+nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.msg{margin:12px 20px 0;padding:10px 12px;border-radius:6px;background:#ecfdf3;color:var(--ok);border:1px solid #abefc6}
+.msg.err{background:#fef3f2;color:var(--err);border-color:#fecdca}
+main{padding:16px 20px 40px;max-width:1500px;margin:0 auto}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+h2{font-size:16px;margin:0 0 6px}
+h3{font-size:14px;margin:18px 0 6px}
+.hint{color:var(--muted);margin:4px 0 12px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+table{border-collapse:collapse}
+.data{width:100%}
+.data th,.data td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle}
+.data th{font-size:12px;color:var(--muted);font-weight:600;background:#f9fafb}
+.data td.num,.data th.num{text-align:right}
+.data tr.wk td{background:var(--wk)}
+.data tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--err)}
+input[type=text],select,textarea,input[type=number]{font:inherit;border:1px solid #d0d5dd;border-radius:6px;padding:6px 8px;background:#fff;color:var(--ink)}
+input.oncall{width:100%;min-width:220px}
+.team input[type=text]{width:220px}
+.add-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+.grid th,.grid td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:0;text-align:center;font-size:12px}
+.grid .name{position:sticky;left:0;z-index:1;background:#fff;text-align:left;padding:4px 8px;white-space:nowrap;min-width:230px}
+.grid th.day{padding:4px 2px;min-width:36px;font-weight:600;line-height:1.2;background:#f9fafb}
+.grid .wk{background:var(--wk)}
+.grid th.day.wk{background:#dfe9ff}
+.cell{width:36px;height:30px;border:none;border-radius:0;padding:0;font-size:13px;display:block}
+.cell.A,.legend b.A{background:#f6fef9;color:#12b76a}
+.cell.U,.legend b.U{background:#eaecf0;color:#98a2b3}
+.cell.F,.legend b.F{background:var(--accent);color:#fff;font-weight:700}
+.cell:hover{outline:2px solid #84caff;outline-offset:-2px}
+.grid input[type=number]{width:34px;padding:2px;border:none;border-radius:0;text-align:center;background:transparent}
+.grid input.ov{background:#fef0c7;font-weight:700}
+.grid td.short{color:var(--err);font-weight:700}
+.grid tr.sep td{border-top:2px solid #d0d5dd}
+.badge{font-size:11px;padding:1px 6px;border-radius:10px;background:#f2f4f7;color:#475467;margin-left:6px}
+.mini{font-size:11px;padding:1px 5px;margin-left:4px}
+.row-acts{margin-left:8px}
+.note-dot{color:var(--warn);font-weight:700;cursor:help}
+.issues{margin:6px 0 0;padding-left:18px}
+.iss{font-size:12px;display:block}
+.iss.err{color:var(--err)}
+.iss.warn{color:var(--warn)}
+.summary{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 4px;font-weight:600}
+.summary .err{color:var(--err)}.summary .warn{color:var(--warn)}.summary .ok{color:var(--ok)}
+.bar{height:8px;background:#eaecf0;border-radius:4px;overflow:hidden;margin:10px 0;max-width:420px}
+.bar>div{height:100%;background:var(--accent);transition:width .2s}
+textarea{width:100%;min-height:120px;margin-bottom:8px}
+.legend{margin:0 0 12px;color:var(--muted);font-size:13px}
+.legend span{display:inline-flex;align-items:center;gap:6px;margin-right:16px}
+.legend b{display:inline-block;width:20px;height:20px;border-radius:4px;text-align:center;font-size:12px;line-height:20px}
+.help li{margin-bottom:5px}
+.flags{font-size:12px;color:#475467}
+code{background:#f2f4f7;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+
+/* ================= Constants ================= */
+const DAY_MS = 86400000;
+const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const HEADERS = ['Date', 'Day', 'On Call', 'On Call BASELINES', 'MGH Call', 'BWH Call', 'DH CALL'];
+const FLAG_LABEL = { mgh: 'MGH Call', bwh: 'BWH CALL', dh: 'DH CALL' };
+const STATE_ICON = { A: '✓', U: '✕', F: '★' };
+const STATE_LABEL = { A: 'available', U: 'unavailable', F: 'must be on call' };
+const NEXT_STATE = { A: 'U', U: 'F', F: 'A' };
+const STORE_KEY = 'call-schedule-builder-v1';
+
+// How hard the builder works to avoid each thing (bigger = more important)
+const W = {
+  hard: 1e6,     // short-staffed day, DH or senior rule broken
+  consec: 2000,  // on call two days in a row (outside their own Fri/Sat/Sun)
+  b2b: 400,      // back-to-back weekends
+  wkOver: 400,   // more than two weekends in a month (per extra day)
+  friCrew: 300,  // Friday not covered by that weekend's crew
+  week: 300,     // more than two weekday calls in one week (per extra call)
+  split: 150,    // weekend split between different people (per person)
+  pair: 120,     // no senior-junior pair when both were available
+  wkFair: 150,   // uneven weekends
+  wdFair: 30,    // uneven weekdays (seniors vs seniors, juniors vs juniors)
+  totFair: 25,   // uneven total days
+  gap2: 40,      // only one day off between calls
+  gap3: 12,      // only two days off between calls
+  lateWeek: 30,  // weekday on Wed/Thu before their own weekend
+  tue: 8,        // weekday on Tue before their own weekend (Monday preferred)
+  hist: 0.5      // how much last month's load counts when evening things out
+};
+
+/* ================= Date helpers ================= */
+const isoToNum = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY_MS);
+const numToIso = n => new Date(n * DAY_MS).toISOString().slice(0, 10);
+const dowOf = iso => new Date(iso + 'T00:00:00Z').getUTCDay();
+const mkIso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function fmtDate(iso) { const [y, m, d] = iso.split('-').map(Number); return `${m}/${d}/${y}`; }
+function shortDate(iso) { const [, m, d] = iso.split('-').map(Number); return `${MONTHS[m - 1].slice(0, 3)} ${d}`; }
+function parseKey(key) { const [y, m] = key.split('-').map(Number); return { y, m: m - 1 }; }
+const monthKey = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}`;
+function shiftKey(key, delta) { const { y, m } = parseKey(key); const t = y * 12 + m + delta; return monthKey(Math.floor(t / 12), ((t % 12) + 12) % 12); }
+function keyLabel(key) { const { y, m } = parseKey(key); return `${MONTHS[m]} ${y}`; }
+function satNumOf(num, w) { return w === 6 ? num : w === 0 ? num - 1 : w === 5 ? num + 1 : null; }
+function weekMonday(num, w) { return num - ((w + 6) % 7); }
+
+// Days on a month's sheet: 1st to last day, keeping weekends whole.
+// A Sunday 1st belongs to last month's sheet; a Saturday last day pulls in the Sunday after.
+function monthDays(key) {
+  const { y, m } = parseKey(key);
+  let start = Date.UTC(y, m, 1) / DAY_MS;
+  let end = Date.UTC(y, m + 1, 0) / DAY_MS;
+  if (new Date(start * DAY_MS).getUTCDay() === 0) start += 1;
+  if (new Date(end * DAY_MS).getUTCDay() === 6) end += 1;
+  const out = [];
+  for (let n = start; n <= end; n++) out.push(numToIso(n));
+  return out;
+}
+
+function validIso(y, m, d) {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const iso = mkIso(y, m, d), t = Date.parse(iso + 'T00:00:00Z');
+  if (isNaN(t)) return null;
+  return new Date(t).toISOString().slice(0, 10) === iso ? iso : null;
+}
+function parseDateCell(s) {
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return validIso(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/))) { let y = +m[3]; if (y < 100) y += 2000; return validIso(y, +m[1], +m[2]); }
+  return null;
+}
+
+/* ================= Small utilities ================= */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function splitNames(s) { return String(s || '').split(/[,;\n]/).map(x => x.trim()).filter(Boolean); }
+function uid() { return 'c' + Math.random().toString(36).slice(2, 10); }
+function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
+const cloneA = A => A.map(a => a.slice());
+function fmtU(u) { const w = Math.floor(u), h = u - w >= 0.5; return (w || !h ? String(w) : '') + (h ? '½' : ''); }
+const cssEsc = v => (window.CSS && CSS.escape ? CSS.escape(v) : v);
+
+/* ================= Starting data (team + October 2026) ================= */
+const SAMPLE_TEAM = [
+  ['Mitch', 'Senior', true], ['Mitali', 'Senior', false], ['Mike', 'Senior', false], ['Jamie', 'Senior', true], ['Andreea', 'Senior', true],
+  ['Trinh', 'Junior', false], ['Aubrey', 'Junior', false], ['Robbie', 'Junior', false], ['Jacob', 'Junior', false]
+];
+const SAMPLE_OCT = [
+  ['Date', 'Day', 'On Call', 'On Call BASELINES', 'MGH Call', 'BWH Call', 'DH CALL'],
+  ['10/1/2026', 'Thursday', '', 'Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/2/2026', 'Friday', 'Trinh, Mike', 'Jamie, Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/3/2026', 'Saturday', 'Trinh', 'Mitali, Jamie, Trinh, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/4/2026', 'Sunday', 'Mitali', 'Mitali, Jamie, Trinh, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/5/2026', 'Monday', '', 'Mitali, Jamie, Trinh, Andreea, Mike, Jacob, Aubrey', '', '', ''],
+  ['10/6/2026', 'Tuesday', '', 'Mitali, Jamie, Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/7/2026', 'Wednesday', '', 'Mitali, Jamie, Andreea, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/8/2026', 'Thursday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/9/2026', 'Friday', '', 'Mitali, Jamie, Andreea, Mike, Mitch', 'MGH Call', '', ''],
+  ['10/10/2026', 'Saturday', 'Mitali, Jamie, Mike', 'Mitali, Jamie, Mike, Mitch', 'MGH Call', 'BWH CALL', ''],
+  ['10/11/2026', 'Sunday', 'Mitch, Jamie, Mike', 'Jamie, Mike, Mitch', 'MGH Call', 'BWH CALL', ''],
+  ['10/12/2026', 'Monday', '', 'Mitali, Jamie, Andreea, Mike, Mitch, Aubrey', 'MGH Call', 'BWH CALL', ''],
+  ['10/13/2026', 'Tuesday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/14/2026', 'Wednesday', '', 'Mitali, Jamie, Andreea, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/15/2026', 'Thursday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/16/2026', 'Friday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Mitch, Aubrey', 'MGH Call', 'BWH CALL', 'DH CALL'],
+  ['10/17/2026', 'Saturday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Mitch', 'MGH Call', 'BWH CALL', 'DH CALL'],
+  ['10/18/2026', 'Sunday', '', 'Jamie, Andreea, Mike, Jacob, Mitch', 'MGH Call', 'BWH CALL', 'DH CALL'],
+  ['10/19/2026', 'Monday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Mitch, Aubrey', '', '', ''],
+  ['10/20/2026', 'Tuesday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/21/2026', 'Wednesday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Mitch, Aubrey', '', '', ''],
+  ['10/22/2026', 'Thursday', '', 'Mitali, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/23/2026', 'Friday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/24/2026', 'Saturday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/25/2026', 'Sunday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
+  ['10/26/2026', 'Monday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Mitch, Aubrey', '', 'BWH ALL CASES', ''],
+  ['10/27/2026', 'Tuesday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch', '', 'BWH ALL CASES', ''],
+  ['10/28/2026', 'Wednesday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', 'MGH ALL CASES', '', ''],
+  ['10/29/2026', 'Thursday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', 'MGH ALL CASES', '', ''],
+  ['10/30/2026', 'Friday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch', 'MGH Call', '', ''],
+  ['10/31/2026', 'Saturday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch', 'MGH Call', '', ''],
+  ['11/1/2026', 'Sunday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch', 'MGH Call', '', '']
+];
+const SAMPLE_OCT_SCHEDULE = [
+  'Andreea, Robbie', 'Trinh, Mike', 'Trinh', 'Mitali', 'Jamie, Jacob', 'Mike, Trinh', 'Mitali, Aubrey', 'Andreea, Robbie',
+  'Mitali, Mitch', 'Mitali, Jamie, Mike', 'Mitch, Jamie, Mike', 'Andreea, Aubrey', 'Jamie, Jacob', 'Mitch, Robbie', 'Mitali, Aubrey', 'Andreea, Jacob',
+  'Andreea, Jamie, Mitch, Jacob', 'Andreea, Jamie, Mitch, Jacob', 'Mitali, Aubrey', 'Mitch, Robbie', 'Jamie, Jacob', 'Mike, Robbie', 'Aubrey, Andreea', 'Aubrey',
+  'Aubrey', 'Mitali, Jacob', 'Mitch, Robbie', 'Mitali, Aubrey', 'Andreea, Jacob', 'Mike, Robbie', 'Mike, Robbie', 'Mike, Robbie'
+];
+
+/* ================= State ================= */
+let data = null;
+const ui = { tab: 'availability', key: '2026-11', msg: '', msgType: '', building: false, progress: 0, storage: 'file', storageError: false, unsaved: false, showPaste: false, pendingRemove: null, pendingReset: false, pendingClear: false };
+let saveTimer = null;
+
+/* ================= Data access ================= */
+function emptyMonth() { return { cells: {}, flags: {}, need: {}, schedule: null, builtAt: null }; }
+function getMonth(key) { if (!data.months[key]) data.months[key] = emptyMonth(); return data.months[key]; }
+function cellState(rec, id, iso) { const r = rec.cells[id]; return (r && r[iso]) || 'A'; }
+function setCell(rec, id, iso, st) { if (!rec.cells[id]) rec.cells[id] = {}; if (st === 'A') delete rec.cells[id][iso]; else rec.cells[id][iso] = st; }
+function flagText(rec, iso) { return Object.assign({ mgh: '', bwh: '', dh: '' }, rec.flags[iso] || {}); }
+const isFlag = t => /\bcall\b/i.test(t || '');
+function defaultNeed(rec, iso) {
+  const w = dowOf(iso);
+  if (w !== 0 && w !== 6) return 2;
+  const f = flagText(rec, iso);
+  return 1 + (isFlag(f.mgh) ? 1 : 0) + (isFlag(f.bwh) ? 1 : 0) + (isFlag(f.dh) ? 1 : 0);
+}
+function needOf(rec, iso) { const v = rec.need[iso]; return typeof v === 'number' ? v : defaultNeed(rec, iso); }
+function byName(name) { const k = String(name).trim().toLowerCase(); return data.team.find(c => c.name.trim().toLowerCase() === k) || null; }
+function nameIndex(P) { const m = new Map(); P.forEach(p => m.set(p.name.trim().toLowerCase(), p.idx)); return m; }
+
+function normalize(d) {
+  if (!d || !Array.isArray(d.team) || !d.months || typeof d.months !== 'object') throw new Error('Not a data file');
+  const out = { version: 1, current: typeof d.current === 'string' && /^\d{4}-\d{2}$/.test(d.current) ? d.current : '2026-11', team: [], months: {} };
+  const seen = new Set();
+  for (const c of d.team) {
+    if (!c || !c.name) continue;
+    const name = String(c.name).trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.team.push({ id: String(c.id || uid()), name, level: c.level === 'Senior' ? 'Senior' : 'Junior', dh: !!c.dh });
+  }
+  for (const k of Object.keys(d.months)) {
+    if (!/^\d{4}-\d{2}$/.test(k)) continue;
+    const r = d.months[k] || {};
+    const obj = x => (x && typeof x === 'object' ? x : {});
+    let schedule = null;
+    if (r.schedule && typeof r.schedule === 'object') {
+      schedule = {};
+      for (const iso of Object.keys(r.schedule)) { const v = r.schedule[iso]; schedule[iso] = Array.isArray(v) ? v.map(String) : splitNames(v); }
+    }
+    out.months[k] = { cells: obj(r.cells), flags: obj(r.flags), need: obj(r.need), schedule, builtAt: r.builtAt || null };
+  }
+  return out;
+}
+
+function seedData() {
+  data = { version: 1, current: '2026-11', months: {}, team: SAMPLE_TEAM.map(([name, level, dh]) => ({ id: uid(), name, level, dh })) };
+  try {
+    const res = importRows(SAMPLE_OCT);
+    const rec = getMonth(res.key);
+    rec.schedule = {};
+    monthDays(res.key).forEach((iso, i) => { rec.schedule[iso] = splitNames(SAMPLE_OCT_SCHEDULE[i] || ''); });
+    rec.builtAt = '2026-09-24T15:30:00Z';
+  } catch (e) { console.error(e); }
+  return data;
+}
+
+/* ================= Import / export ================= */
+function parseDelimited(text) {
+  text = String(text || '').replace(/^\uFEFF/, '');
+  const first = text.split(/\r?\n/, 1)[0] || '';
+  const delim = (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? '\t' : ',';
+  const rows = [];
+  let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += ch;
+    } else if (ch === '"' && field === '') q = true;
+    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (ch !== '\r') field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => String(c).trim() !== ''));
+}
+
+// Reads rows in the original sheet's layout. On Call names become "must be on call".
+function importRows(rows) {
+  const hi = rows.findIndex(r => r.some(c => String(c).trim().toLowerCase() === 'date'));
+  if (hi < 0) throw new Error('Couldn’t find a header row with a “Date” column. Include the header row when you copy or export.');
+  const header = rows[hi].map(h => String(h).trim().toLowerCase());
+  const find = t => header.findIndex(t);
+  const cDate = find(h => h === 'date');
+  const cOn = find(h => h === 'on call');
+  const cBase = find(h => h.includes('baseline'));
+  const cM = find(h => h.startsWith('mgh')), cB = find(h => h.startsWith('bwh')), cD = find(h => h.startsWith('dh'));
+  if (cBase < 0) throw new Error('Couldn’t find the “On Call BASELINES” column.');
+  const at = (r, c) => (c >= 0 && r[c] != null ? String(r[c]).trim() : '');
+  const entries = [];
+  for (const r of rows.slice(hi + 1)) {
+    const iso = parseDateCell(at(r, cDate));
+    if (!iso) continue;
+    entries.push({ iso, on: splitNames(at(r, cOn)), base: splitNames(at(r, cBase)), mgh: at(r, cM), bwh: at(r, cB), dh: at(r, cD) });
+  }
+  if (!entries.length) throw new Error('No dates were found under the Date column.');
+  const counts = {};
+  for (const e of entries) { const k = e.iso.slice(0, 7); counts[k] = (counts[k] || 0) + 1; }
+  const key = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  const range = new Set(monthDays(key));
+  const added = [];
+  const ensure = nm => { if (!byName(nm)) { data.team.push({ id: uid(), name: nm, level: 'Junior', dh: false }); added.push(nm); } };
+  for (const e of entries) { e.base.forEach(ensure); e.on.forEach(ensure); }
+  const rec = getMonth(key);
+  let used = 0, skipped = 0;
+  for (const e of entries) {
+    if (!range.has(e.iso)) { skipped++; continue; }
+    used++;
+    const base = new Set(e.base.map(n => n.toLowerCase())), on = new Set(e.on.map(n => n.toLowerCase()));
+    for (const c of data.team) {
+      const k = c.name.trim().toLowerCase();
+      setCell(rec, c.id, e.iso, on.has(k) ? 'F' : base.has(k) ? 'A' : 'U');
+    }
+    rec.flags[e.iso] = { mgh: e.mgh, bwh: e.bwh, dh: e.dh };
+  }
+  return { key, used, skipped, added };
+}
+
+function exportRows(key) {
+  const rec = getMonth(key);
+  const rows = [HEADERS.slice()];
+  for (const iso of monthDays(key)) {
+    const on = (rec.schedule && rec.schedule[iso]) || [];
+    const base = data.team.filter(c => cellState(rec, c.id, iso) !== 'U').map(c => c.name);
+    const f = flagText(rec, iso);
+    rows.push([fmtDate(iso), DOW[dowOf(iso)], on.join(', '), base.join(', '), f.mgh, f.bwh, f.dh]);
+  }
+  return rows;
+}
+const csvCell = v => (/[",\r\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+
+/* ================= The scheduling problem ================= */
+function contextFor(key, P, startNum) {
+  // Last two weeks of the previous month's saved schedule (for the month boundary)
+  const rec = data.months[shiftKey(key, -1)];
+  const out = [];
+  if (!rec || !rec.schedule) return out;
+  const map = nameIndex(P);
+  for (const iso of Object.keys(rec.schedule).sort()) {
+    const num = isoToNum(iso);
+    if (num >= startNum || num < startNum - 14) continue;
+    const persons = [];
+    for (const nm of rec.schedule[iso]) { const i = map.get(String(nm).trim().toLowerCase()); if (i != null && !persons.includes(i)) persons.push(i); }
+    if (!persons.length) continue;
+    const w = dowOf(iso);
+    out.push({ iso, num, w, sat: satNumOf(num, w), persons, ctx: true });
+  }
+  return out;
+}
+
+function historyFor(key, P) {
+  const prevKey = shiftKey(key, -1), rec = data.months[prevKey];
+  const hU = P.map(() => 0), hWD = P.map(() => 0), hT = P.map(() => 0);
+  if (!rec || !rec.schedule) return { hU, hWD, hT, has: false };
+  const map = nameIndex(P);
+  const sets = P.map(() => new Set());
+  for (const iso of monthDays(prevKey)) for (const nm of (rec.schedule[iso] || [])) { const i = map.get(String(nm).trim().toLowerCase()); if (i != null) sets[i].add(isoToNum(iso)); }
+  sets.forEach((s, i) => {
+    for (const num of s) {
+      const w = new Date(num * DAY_MS).getUTCDay();
+      hT[i]++;
+      if (w === 0 || w === 6) hU[i] += 0.5;
+      else if (!(w === 5 && (s.has(num + 1) || s.has(num + 2)))) hWD[i]++;
+    }
+  });
+  return { hU, hWD, hT, has: true };
+}
+
+function buildProblem(key) {
+  const rec = getMonth(key);
+  const P = data.team.map((c, i) => ({ idx: i, id: c.id, name: c.name, senior: c.level === 'Senior', dh: !!c.dh }));
+  const D = monthDays(key).map((iso, di) => {
+    const num = isoToNum(iso), w = dowOf(iso), ft = flagText(rec, iso);
+    const fl = { mgh: isFlag(ft.mgh), bwh: isFlag(ft.bwh), dh: isFlag(ft.dh) };
+    const avail = [], fixed = [];
+    for (const p of P) { const st = cellState(rec, p.id, iso); if (st !== 'U') avail.push(p.idx); if (st === 'F') fixed.push(p.idx); }
+    const wkend = w === 0 || w === 6;
+    return {
+      di, iso, num, w, fl, avail, fixed,
+      availSet: new Set(avail), fixedSet: new Set(fixed),
+      need: Math.max(needOf(rec, iso), fixed.length),
+      needSenior: wkend && fl.mgh && fl.bwh, needDH: wkend && fl.dh,
+      anySen: avail.some(i => P[i].senior), anyJun: avail.some(i => !P[i].senior),
+      sat: satNumOf(num, w), week: weekMonday(num, w)
+    };
+  });
+  const ctx = contextFor(key, P, D.length ? D[0].num : 0);
+  const hist = historyFor(key, P);
+  const gm = new Map();
+  for (const d of D) {
+    if (d.sat == null) continue;
+    if (!gm.has(d.sat)) gm.set(d.sat, { sNum: d.sat, fri: null, sat: null, sun: null, prevFri: null, priority: 0 });
+    const g = gm.get(d.sat);
+    if (d.w === 5) g.fri = d.di; else if (d.w === 6) g.sat = d.di; else g.sun = d.di;
+  }
+  const weekends = [...gm.values()];
+  for (const g of weekends) {
+    const fls = [g.sat, g.sun].filter(x => x != null).map(x => D[x].fl);
+    const any = k => fls.some(f => f[k]);
+    g.priority = any('dh') ? 3 : any('mgh') && any('bwh') ? 2 : any('mgh') || any('bwh') ? 1 : 0;
+    if (g.fri == null && fls.length) { const e = ctx.find(x => x.num === g.sNum - 1); if (e) g.prevFri = e.persons; }
+  }
+  const zeros = () => P.map(() => 0);
+  const availWk = zeros(), availWd = zeros(), availAll = zeros();
+  for (const d of D) for (const i of d.avail) { availAll[i]++; if (d.w === 0 || d.w === 6) availWk[i]++; else availWd[i]++; }
+  return {
+    key, rec, P, D, weekends, ctx, availWk, availWd, availAll,
+    everyone: P.map(p => p.idx), seniors: P.filter(p => p.senior).map(p => p.idx), juniors: P.filter(p => !p.senior).map(p => p.idx),
+    h: hist.has ? W.hist : 0, hU: hist.hU, hWD: hist.hWD, hT: hist.hT, hasHist: hist.has
+  };
+}
+
+// Spread of a load compared with each person's share of availability
+function fair(vals, hist, avail, idxs, h) {
+  let sv = 0, sa = 0;
+  for (const i of idxs) { sv += vals[i] + h * hist[i]; sa += avail[i]; }
+  if (!sa) return 0;
+  let s = 0;
+  for (const i of idxs) { const d = vals[i] + h * hist[i] - sv * avail[i] / sa; s += d * d; }
+  return s;
+}
+
+// Total penalty for a full or partial assignment A (A[dayIndex] = list of person indexes)
+function cost(pr, A) {
+  const { P, D } = pr, n = P.length;
+  let c = 0;
+  const L = [];
+  for (let i = 0; i < n; i++) L.push([]);
+  for (const e of pr.ctx) for (const p of e.persons) L[p].push(e);
+  for (let di = 0; di < D.length; di++) {
+    const d = D[di], a = A[di];
+    if (a.length < d.need) c += W.hard * (d.need - a.length);
+    let sen = false, jun = false, dh = false;
+    for (const p of a) { const q = P[p]; if (q.senior) sen = true; else jun = true; if (q.dh) dh = true; L[p].push(d); }
+    if (d.needSenior && !sen) c += W.hard;
+    if (d.needDH && !dh) c += W.hard;
+    if (a.length >= 2) { if (!jun && d.anyJun) c += W.pair; if (!sen && d.anySen) c += W.pair; }
+  }
+  for (const g of pr.weekends) {
+    const sA = g.sat != null ? A[g.sat] : null, uA = g.sun != null ? A[g.sun] : null;
+    if (sA && uA) {
+      for (const p of sA) if (!uA.includes(p)) c += W.split;
+      for (const p of uA) if (!sA.includes(p)) c += W.split;
+    }
+    if (!sA && !uA) continue;
+    const crew = new Set(sA || []);
+    if (uA) for (const p of uA) crew.add(p);
+    if (!crew.size) continue;
+    if (g.fri != null) {
+      const fd = D[g.fri];
+      let elig = 0, act = 0;
+      for (const p of crew) if (fd.availSet.has(p)) elig++;
+      for (const p of A[g.fri]) if (crew.has(p)) act++;
+      const needed = Math.min(fd.need, elig);
+      if (act < needed) c += W.friCrew * (needed - act);
+    } else if (g.prevFri) {
+      let elig = 0, act = 0;
+      for (const p of g.prevFri) {
+        if ((g.sat != null && D[g.sat].availSet.has(p)) || (g.sun != null && D[g.sun].availSet.has(p))) elig++;
+        if (crew.has(p)) act++;
+      }
+      const cap = Math.max(g.sat != null ? D[g.sat].need : 0, g.sun != null ? D[g.sun].need : 0);
+      const needed = Math.min(elig, cap);
+      if (act < needed) c += W.friCrew * (needed - act);
+    }
+  }
+  const U = new Array(n).fill(0), WD = new Array(n).fill(0), TOT = new Array(n).fill(0);
+  for (let p = 0; p < n; p++) {
+    const list = L[p];
+    if (!list.length) continue;
+    const wk = new Set();
+    for (const e of list) if (e.w === 0 || e.w === 6) wk.add(e.sat);
+    const weekCnt = {};
+    let prev = null;
+    for (const e of list) {
+      if (prev && !(prev.sat != null && prev.sat === e.sat)) {
+        const gap = e.num - prev.num;
+        if (gap <= 1) c += W.consec; else if (gap === 2) c += W.gap2; else if (gap === 3) c += W.gap3;
+      }
+      prev = e;
+      if (e.ctx) continue;
+      TOT[p]++;
+      if (e.w === 0 || e.w === 6) { U[p] += 0.5; continue; }
+      if (e.w === 5 && wk.has(e.sat)) continue;
+      WD[p]++;
+      weekCnt[e.week] = (weekCnt[e.week] || 0) + 1;
+      if (e.w >= 2 && e.w <= 4 && wk.has(e.week + 5)) c += e.w === 2 ? W.tue : W.lateWeek;
+    }
+    for (const k in weekCnt) if (weekCnt[k] > 2) c += W.week * (weekCnt[k] - 2);
+    for (const s of wk) if (wk.has(s - 7)) c += W.b2b;
+    if (U[p] > 2) c += W.wkOver * (U[p] - 2) * 2;
+  }
+  c += W.wkFair * fair(U, pr.hU, pr.availWk, pr.everyone, pr.h);
+  c += W.wdFair * (fair(WD, pr.hWD, pr.availWd, pr.seniors, pr.h) + fair(WD, pr.hWD, pr.availWd, pr.juniors, pr.h));
+  c += W.totFair * fair(TOT, pr.hT, pr.availAll, pr.everyone, pr.h);
+  return c;
+}
+
+/* ---------- Building a first draft ---------- */
+function fillDay(pr, A, di, rng) {
+  const d = pr.D[di];
+  while (A[di].length < d.need) {
+    let best = -1, bc = Infinity;
+    for (const p of d.avail) {
+      if (A[di].includes(p)) continue;
+      A[di].push(p);
+      const cc = cost(pr, A) + rng() * 5;
+      A[di].pop();
+      if (cc < bc) { bc = cc; best = p; }
+    }
+    if (best < 0) break;
+    A[di].push(best);
+  }
+}
+
+function fillWeekend(pr, A, g, rng) {
+  const days = [g.sat, g.sun].filter(x => x != null);
+  for (let guard = 0; guard < 12; guard++) {
+    if (!days.some(di => A[di].length < pr.D[di].need)) break;
+    let best = null, bc = Infinity;
+    for (const p of pr.P) {
+      const add = days.filter(di => A[di].length < pr.D[di].need && pr.D[di].availSet.has(p.idx) && !A[di].includes(p.idx));
+      if (!add.length) continue;
+      for (const di of add) A[di].push(p.idx);
+      const cc = cost(pr, A) + rng() * 5;
+      for (const di of add) A[di].pop();
+      if (cc < bc) { bc = cc; best = { p: p.idx, add }; }
+    }
+    if (!best) break;
+    for (const di of best.add) A[di].push(best.p);
+  }
+}
+
+function greedy(pr, rng) {
+  const A = pr.D.map(d => d.fixed.slice());
+  const wks = pr.weekends.map(g => ({ g, r: rng() })).sort((a, b) => (b.g.priority - a.g.priority) || (a.r - b.r)).map(x => x.g);
+  for (const g of wks) fillWeekend(pr, A, g, rng);
+  for (const g of pr.weekends) if (g.fri != null) fillDay(pr, A, g.fri, rng);
+  const rest = pr.D.filter(d => A[d.di].length < d.need).map(d => ({ di: d.di, k: d.avail.length, r: rng() }));
+  rest.sort((a, b) => (a.k - b.k) || (a.r - b.r));
+  for (const x of rest) fillDay(pr, A, x.di, rng);
+  return A;
+}
+
+/* ---------- Improving the draft ---------- */
+function moveReplace(pr, A, rng) {
+  const di = Math.floor(rng() * pr.D.length), d = pr.D[di], a = A[di];
+  const cands = d.avail.filter(p => !a.includes(p));
+  if (!cands.length) return null;
+  const saved = [[di, a.slice()]];
+  if (a.length < d.need) { a.push(pick(cands, rng)); return saved; }
+  const movable = a.filter(p => !d.fixedSet.has(p));
+  if (!movable.length) return null;
+  const out = pick(movable, rng);
+  a[a.indexOf(out)] = pick(cands, rng);
+  return saved;
+}
+
+function fullWeekends(pr) { return pr.weekends.filter(g => g.sat != null && g.sun != null); }
+
+function moveWeekendReplace(pr, A, rng) {
+  const gs = fullWeekends(pr);
+  if (!gs.length) return null;
+  const g = pick(gs, rng), sA = A[g.sat], uA = A[g.sun], sD = pr.D[g.sat], uD = pr.D[g.sun];
+  const both = sA.filter(p => uA.includes(p) && !sD.fixedSet.has(p) && !uD.fixedSet.has(p));
+  if (!both.length) return null;
+  const cands = sD.avail.filter(p => uD.availSet.has(p) && !sA.includes(p) && !uA.includes(p));
+  if (!cands.length) return null;
+  const out = pick(both, rng), inn = pick(cands, rng);
+  const saved = [[g.sat, sA.slice()], [g.sun, uA.slice()]];
+  sA[sA.indexOf(out)] = inn;
+  uA[uA.indexOf(out)] = inn;
+  return saved;
+}
+
+function moveSwap(pr, A, rng) {
+  const n = pr.D.length, d1 = Math.floor(rng() * n), d2 = Math.floor(rng() * n);
+  if (d1 === d2) return null;
+  const a1 = A[d1], a2 = A[d2], D1 = pr.D[d1], D2 = pr.D[d2];
+  const m1 = a1.filter(p => !D1.fixedSet.has(p) && D2.availSet.has(p) && !a2.includes(p));
+  const m2 = a2.filter(p => !D2.fixedSet.has(p) && D1.availSet.has(p) && !a1.includes(p));
+  if (!m1.length || !m2.length) return null;
+  const p1 = pick(m1, rng), p2 = pick(m2, rng);
+  const saved = [[d1, a1.slice()], [d2, a2.slice()]];
+  a1[a1.indexOf(p1)] = p2;
+  a2[a2.indexOf(p2)] = p1;
+  return saved;
+}
+
+function moveWeekendSwap(pr, A, rng) {
+  const gs = fullWeekends(pr);
+  if (gs.length < 2) return null;
+  const g1 = pick(gs, rng), g2 = pick(gs, rng);
+  if (g1 === g2) return null;
+  const both = g => A[g.sat].filter(p => A[g.sun].includes(p) && !pr.D[g.sat].fixedSet.has(p) && !pr.D[g.sun].fixedSet.has(p));
+  const fits = (p, g) => pr.D[g.sat].availSet.has(p) && pr.D[g.sun].availSet.has(p) && !A[g.sat].includes(p) && !A[g.sun].includes(p);
+  const m1 = both(g1).filter(p => fits(p, g2)), m2 = both(g2).filter(p => fits(p, g1));
+  if (!m1.length || !m2.length) return null;
+  const p1 = pick(m1, rng), p2 = pick(m2, rng);
+  const saved = [[g1.sat, A[g1.sat].slice()], [g1.sun, A[g1.sun].slice()], [g2.sat, A[g2.sat].slice()], [g2.sun, A[g2.sun].slice()]];
+  for (const di of [g1.sat, g1.sun]) { const a = A[di]; a[a.indexOf(p1)] = p2; }
+  for (const di of [g2.sat, g2.sun]) { const a = A[di]; a[a.indexOf(p2)] = p1; }
+  return saved;
+}
+
+function propose(pr, A, rng) {
+  const r = rng();
+  if (r < 0.35) return moveReplace(pr, A, rng);
+  if (r < 0.6) return moveWeekendReplace(pr, A, rng);
+  if (r < 0.85) return moveSwap(pr, A, rng);
+  return moveWeekendSwap(pr, A, rng);
+}
+function restore(A, saved) { for (let k = saved.length - 1; k >= 0; k--) { const [di, arr] = saved[k]; A[di] = arr; } }
+
+// Several fresh drafts, each improved by simulated annealing; keeps the best.
+function solve(pr, opts, onProgress, onDone) {
+  const restarts = opts.restarts, iters = opts.iters;
+  let best = null, bestCost = Infinity, r = 0;
+  const step = () => {
+    const rng = mulberry32((opts.seed + r * 7919) >>> 0);
+    const A = greedy(pr, rng);
+    let cur = cost(pr, A), locBest = cur, locA = cloneA(A);
+    const T0 = 300, T1 = 1;
+    for (let it = 0; it < iters; it++) {
+      const T = T0 * Math.pow(T1 / T0, it / iters);
+      const saved = propose(pr, A, rng);
+      if (!saved) continue;
+      const nc = cost(pr, A);
+      if (nc <= cur || rng() < Math.exp((cur - nc) / T)) {
+        cur = nc;
+        if (nc < locBest) { locBest = nc; locA = cloneA(A); }
+      } else restore(A, saved);
+    }
+    if (locBest < bestCost) { bestCost = locBest; best = locA; }
+    r++;
+    onProgress(r / restarts);
+    if (r < restarts) setTimeout(step, 0); else onDone(best, bestCost);
+  };
+  setTimeout(step, 20);
+}
+
+/* ================= Checking a schedule ================= */
+function personStats(pr, A) {
+  const n = pr.P.length;
+  const L = Array.from({ length: n }, () => []);
+  for (const e of pr.ctx) for (const p of e.persons) L[p].push(e);
+  pr.D.forEach((d, di) => { for (const p of A[di]) L[p].push(d); });
+  return L.map(list => {
+    const wk = new Set();
+    list.forEach(e => { if (e.w === 0 || e.w === 6) wk.add(e.sat); });
+    const s = { U: 0, WD: 0, TOT: 0, FRI: 0, consec: [], b2b: [], weekOver: [] };
+    const weekCnt = {};
+    let prev = null;
+    for (const e of list) {
+      if (prev && !(prev.sat != null && prev.sat === e.sat) && e.num - prev.num <= 1) s.consec.push([prev, e]);
+      prev = e;
+      if (e.ctx) continue;
+      s.TOT++;
+      if (e.w === 0 || e.w === 6) { s.U += 0.5; continue; }
+      if (e.w === 5 && wk.has(e.sat)) { s.FRI++; continue; }
+      s.WD++;
+      weekCnt[e.week] = (weekCnt[e.week] || 0) + 1;
+    }
+    for (const k in weekCnt) if (weekCnt[k] > 2) s.weekOver.push(+k);
+    [...wk].sort((a, b) => a - b).forEach(x => { if (wk.has(x - 7)) s.b2b.push(x); });
+    return s;
+  });
+}
+
+function analyze(key) {
+  const pr = buildProblem(key), rec = pr.rec, sched = rec.schedule || {};
+  const map = nameIndex(pr.P);
+  const A = pr.D.map(() => []);
+  const dayIssues = pr.D.map(() => []);
+  const general = [];
+  pr.D.forEach((d, di) => {
+    for (const nm of (sched[d.iso] || [])) {
+      const i = map.get(String(nm).trim().toLowerCase());
+      if (i == null) dayIssues[di].push(['err', `“${nm}” isn’t on the team list`]);
+      else if (!A[di].includes(i)) A[di].push(i);
+    }
+  });
+  const N = i => pr.P[i].name;
+  const dhNames = pr.P.filter(p => p.dh).map(p => p.name);
+  pr.D.forEach((d, di) => {
+    const a = A[di], I = dayIssues[di];
+    if (a.length < d.need) I.push(['err', `Needs ${d.need}, has ${a.length}`]);
+    else if (a.length > d.need) I.push(['warn', `Has ${a.length}, needs ${d.need}`]);
+    for (const p of a) if (!d.availSet.has(p)) I.push(['err', `${N(p)} is marked unavailable`]);
+    for (const p of d.fixed) if (!a.includes(p)) I.push(['err', `${N(p)} is set as must be on call`]);
+    const sen = a.some(p => pr.P[p].senior), jun = a.some(p => !pr.P[p].senior), dh = a.some(p => pr.P[p].dh);
+    if (d.needSenior && !sen) I.push(['err', 'MGH and BWH day needs a senior']);
+    if (d.needDH && !dh) I.push(['err', dhNames.length ? `DH day needs one of ${dhNames.join(', ')}` : 'DH day needs someone DH-eligible (set this on the Team tab)']);
+    if (a.length >= 2 && !jun && d.anyJun) I.push(['warn', 'No junior, though one was available']);
+    if (a.length >= 2 && !sen && d.anySen) I.push(['warn', 'No senior, though one was available']);
+  });
+  for (const g of pr.weekends) {
+    if (g.fri == null) continue;
+    const crew = new Set([...(g.sat != null ? A[g.sat] : []), ...(g.sun != null ? A[g.sun] : [])]);
+    if (!crew.size) continue;
+    const fd = pr.D[g.fri];
+    let elig = 0, act = 0;
+    for (const p of crew) if (fd.availSet.has(p)) elig++;
+    for (const p of A[g.fri]) if (crew.has(p)) act++;
+    if (act < Math.min(fd.need, elig)) dayIssues[g.fri].push(['warn', 'Friday isn’t covered by that weekend’s crew']);
+  }
+  const stats = personStats(pr, A);
+  const diOf = new Map(pr.D.map((d, i) => [d.iso, i]));
+  stats.forEach((s, p) => {
+    for (const [a, b] of s.consec) { const di = diOf.get(b.iso); if (di != null) dayIssues[di].push(['warn', `${N(p)} is also on ${shortDate(a.iso)} (two days in a row)`]); }
+    for (const x of s.b2b) general.push(['warn', `${N(p)} has back-to-back weekends (${shortDate(numToIso(x - 7))} and ${shortDate(numToIso(x))})`]);
+    for (const k of s.weekOver) general.push(['warn', `${N(p)} has more than two weekday calls in the week of ${shortDate(numToIso(k))}`]);
+    if (s.U > 2) general.push(['warn', `${N(p)} has more than two weekends this month`]);
+  });
+  const all = dayIssues.flat().concat(general);
+  return { pr, A, dayIssues, general, stats, errs: all.filter(x => x[0] === 'err').length, warns: all.filter(x => x[0] === 'warn').length };
+}
+
+/* ================= Rendering ================= */
+function statusText() {
+  if (ui.storage === 'claude') return ui.storageError ? 'Couldn’t save automatically just now. Use “Save data file” to keep a copy.' : 'Changes save automatically here. Use “Save data file” for a backup or to move everything to another computer.';
+  return ui.unsaved ? 'Unsaved changes. This copy runs outside Claude, so use “Save data file” before closing.' : 'Running outside Claude: nothing saves automatically. Use “Save data file” before closing and “Load data file” next time.';
+}
+
+function headerHtml() {
+  const tabs = [['team', 'Team'], ['availability', 'Availability'], ['schedule', 'Schedule'], ['help', 'How it works']];
+  return `
+  <header>
+    <div class="brand">Call Schedule Builder</div>
+    <div class="month-nav">
+      <button data-act="month" data-d="-1" aria-label="Previous month">‹</button>
+      <span class="month-label">${esc(keyLabel(ui.key))}</span>
+      <button data-act="month" data-d="1" aria-label="Next month">›</button>
+    </div>
+    <div class="file-actions">
+      <button data-act="save-file">Save data file</button>
+      <label class="btn">Load data file<input type="file" accept=".json,application/json" data-act="load-file" hidden></label>
+    </div>
+  </header>
+  <div class="status">${esc(statusText())}</div>
+  <nav class="tabs">${tabs.map(([k, l]) => `<button data-act="tab" data-tab="${k}" class="${ui.tab === k ? 'active' : ''}">${l}</button>`).join('')}</nav>
+  ${ui.msg ? `<div class="msg ${ui.msgType === 'err' ? 'err' : ''}">${esc(ui.msg)} <button class="link" data-act="dismiss">Dismiss</button></div>` : ''}`;
+}
+
+function teamHtml() {
+  const rows = data.team.map(c => `<tr>
+    <td><input type="text" value="${esc(c.name)}" data-act="team-name" data-id="${esc(c.id)}" aria-label="Name"></td>
+    <td><select data-act="team-level" data-id="${esc(c.id)}" aria-label="Level"><option ${c.level === 'Senior' ? 'selected' : ''}>Senior</option><option ${c.level === 'Junior' ? 'selected' : ''}>Junior</option></select></td>
+    <td><label class="chk"><input type="checkbox" data-act="team-dh" data-id="${esc(c.id)}" ${c.dh ? 'checked' : ''}> Can take DH call</label></td>
+    <td>${ui.pendingRemove === c.id
+      ? `<button class="danger" data-act="team-remove-confirm" data-id="${esc(c.id)}">Confirm remove</button> <button data-act="team-remove-cancel">Cancel</button>`
+      : `<button class="danger" data-act="team-remove" data-id="${esc(c.id)}">Remove</button>`}</td>
+  </tr>`).join('');
+  const s = data.team.filter(c => c.level === 'Senior').length, dh = data.team.filter(c => c.dh).length;
+  return `<div class="card">
+    <h2>Team</h2>
+    <p class="hint">${data.team.length} clinicians: ${s} senior, ${data.team.length - s} junior, ${dh} DH-eligible. Changes apply to every schedule you build from now on. Schedules already built keep the names they had.</p>
+    <table class="data team"><thead><tr><th>Name</th><th>Level</th><th>DH call</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="hint">No one yet.</td></tr>'}</tbody></table>
+    <div class="add-row">
+      <input type="text" id="new-name" placeholder="New clinician’s name" aria-label="New clinician’s name">
+      <select id="new-level" aria-label="Level"><option>Senior</option><option selected>Junior</option></select>
+      <label class="chk"><input type="checkbox" id="new-dh"> Can take DH call</label>
+      <button class="primary" data-act="team-add">Add clinician</button>
+    </div>
+  </div>`;
+}
+
+function availabilityHtml() {
+  const key = ui.key, rec = getMonth(key), days = monthDays(key), { m } = parseKey(key);
+  if (!data.team.length) return `<div class="card"><h2>Availability</h2><p class="hint">Add clinicians on the Team tab first.</p></div>`;
+  const wkc = iso => { const w = dowOf(iso); return w === 0 || w === 6 ? 'wk' : ''; };
+  const head = days.map(iso => {
+    const w = dowOf(iso), parts = iso.split('-').map(Number);
+    const pre = parts[1] - 1 !== m ? MONTHS[parts[1] - 1].slice(0, 3) + ' ' : '';
+    return `<th class="day ${wkc(iso)}" title="${esc(DOW[w] + ', ' + fmtDate(iso))}">${DOW3[w]}<br>${pre}${parts[2]}</th>`;
+  }).join('');
+  const rows = data.team.map(c => {
+    const cells = days.map(iso => {
+      const st = cellState(rec, c.id, iso);
+      return `<td class="${wkc(iso)}"><button class="cell ${st}" data-act="cell" data-id="${esc(c.id)}" data-iso="${iso}" title="${esc(c.name + ', ' + fmtDate(iso) + ': ' + STATE_LABEL[st])}">${STATE_ICON[st]}</button></td>`;
+    }).join('');
+    return `<tr><td class="name">${esc(c.name)}<span class="badge">${c.level}${c.dh ? ' · DH' : ''}</span><span class="row-acts"><button class="mini" data-act="row-all" data-id="${esc(c.id)}" data-st="A" title="Available all month">all ✓</button><button class="mini" data-act="row-all" data-id="${esc(c.id)}" data-st="U" title="Away all month">all ✕</button></span></td>${cells}</tr>`;
+  }).join('');
+  const flagRow = (k, label, first) => `<tr class="${first ? 'sep' : ''}"><td class="name">${label} flag</td>${days.map(iso => {
+    const t = flagText(rec, iso)[k], on = isFlag(t);
+    const note = t && !on ? `<span class="note-dot" title="${esc('Note: ' + t)}">•</span>` : '';
+    return `<td class="${wkc(iso)}"><input type="checkbox" data-act="flag" data-k="${k}" data-iso="${iso}" ${on ? 'checked' : ''} title="${esc(label + ', ' + fmtDate(iso))}">${note}</td>`;
+  }).join('')}</tr>`;
+  const needRow = `<tr><td class="name">People needed</td>${days.map(iso => {
+    const ov = typeof rec.need[iso] === 'number';
+    return `<td class="${wkc(iso)}"><input type="number" min="0" max="9" class="${ov ? 'ov' : ''}" value="${needOf(rec, iso)}" data-act="need" data-iso="${iso}" title="${esc('Default ' + defaultNeed(rec, iso) + (ov ? '; changed for this day' : ''))}"></td>`;
+  }).join('')}</tr>`;
+  const availRow = `<tr><td class="name">Available</td>${days.map(iso => {
+    const cnt = data.team.filter(c => cellState(rec, c.id, iso) !== 'U').length;
+    return `<td class="${wkc(iso)} ${cnt < needOf(rec, iso) ? 'short' : ''}">${cnt}</td>`;
+  }).join('')}</tr>`;
+  return `<div class="card">
+    <h2>Availability · ${esc(keyLabel(key))}</h2>
+    <p class="hint">Click a box to change it. Everyone starts as available. ★ fixes someone on that day, and the builder always keeps them there.</p>
+    <div class="legend"><span><b class="A">✓</b>available</span><span><b class="U">✕</b>unavailable</span><span><b class="F">★</b>must be on call</span></div>
+    <div class="toolbar">
+      <label class="btn">Import from spreadsheet (CSV)<input type="file" accept=".csv,text/csv,text/plain" data-act="import-file" hidden></label>
+      <button data-act="toggle-paste">${ui.showPaste ? 'Hide paste box' : 'Paste from Excel'}</button>
+      ${ui.pendingReset
+        ? `<button class="danger" data-act="reset-avail-confirm">Confirm reset</button><button data-act="reset-avail-cancel">Cancel</button>`
+        : `<button data-act="reset-avail">Reset month to everyone available</button>`}
+    </div>
+    ${ui.showPaste ? `<textarea id="paste-box" placeholder="In Excel, select from the Date header to the DH CALL column (header row included), copy, and paste here."></textarea>
+      <div class="toolbar"><button class="primary" data-act="import-paste">Import pasted rows</button></div>` : ''}
+    <div class="scroll"><table class="grid"><thead><tr><th class="name">Clinician</th>${head}</tr></thead>
+      <tbody>${rows}${flagRow('mgh', 'MGH', true)}${flagRow('bwh', 'BWH', false)}${flagRow('dh', 'DH', false)}${needRow}${availRow}</tbody></table></div>
+    <p class="hint" style="margin-top:10px">Each ticked site flag adds one person on a Saturday or Sunday. On other days the flags are only carried into the export. Change “People needed” for one-off days such as a holiday; changed days are highlighted. Red counts mean fewer people are available than needed.</p>
+  </div>`;
+}
+
+function scheduleHtml() {
+  const key = ui.key, rec = getMonth(key), prevKey = shiftKey(key, -1), prevRec = data.months[prevKey];
+  const hasPrev = !!(prevRec && prevRec.schedule);
+  let html = `<div class="card">
+    <h2>Schedule · ${esc(keyLabel(key))}</h2>
+    <p class="hint">Uses this month’s availability${hasPrev ? ` and ${esc(keyLabel(prevKey))}’s schedule (for the month boundary and fairness)` : ''}. You can type in any On Call cell; the checks update when you press Enter or click away.</p>
+    <div class="toolbar">
+      <button class="primary" data-act="build" ${ui.building ? 'disabled' : ''}>${ui.building ? 'Building…' : rec.schedule ? 'Build a new version' : 'Build schedule'}</button>
+      <button data-act="download-csv">Download CSV</button>
+      <button data-act="copy-excel">Copy for Excel</button>
+      ${rec.schedule ? (ui.pendingClear
+        ? `<button class="danger" data-act="clear-sched-confirm">Confirm clear</button><button data-act="clear-sched-cancel">Cancel</button>`
+        : `<button class="danger" data-act="clear-sched">Clear schedule</button>`) : ''}
+    </div>
+    ${ui.building ? `<div class="bar"><div id="build-bar" style="width:${Math.round(ui.progress * 100)}%"></div></div>` : ''}
+    ${hasPrev ? '' : `<p class="hint">No schedule is saved for ${esc(keyLabel(prevKey))}, so the first few days aren’t checked against it.</p>`}`;
+  if (!rec.schedule) return html + `<p class="hint">Set availability and site flags first, then build.</p></div>`;
+  const an = analyze(key);
+  html += `<div class="summary">${an.errs ? `<span class="err">● ${an.errs} must fix</span>` : '<span class="ok">✓ Every staffing rule is met</span>'}<span class="warn">▲ ${an.warns} worth a look</span></div>
+    <p class="hint">● means a rule is broken or someone unavailable is scheduled. ▲ marks preferences that couldn’t all be met, which is often unavoidable with that month’s availability.</p>
+    ${an.general.length ? `<ul class="issues">${an.general.map(x => `<li class="iss ${x[0]}">${esc(x[1])}</li>`).join('')}</ul>` : ''}
+  </div>`;
+  const rows = an.pr.D.map((d, di) => {
+    const names = rec.schedule[d.iso] || [];
+    const iss = an.dayIssues[di];
+    const bad = iss.some(x => x[0] === 'err');
+    const f = flagText(rec, d.iso);
+    const flags = ['mgh', 'bwh', 'dh'].map(k => f[k]).filter(Boolean).map(esc).join(' · ');
+    return `<tr class="${d.w === 0 || d.w === 6 ? 'wk' : ''} ${bad ? 'bad' : ''}">
+      <td>${fmtDate(d.iso)}</td><td>${DOW[d.w]}</td>
+      <td><input class="oncall" type="text" value="${esc(names.join(', '))}" data-act="oncall" data-iso="${d.iso}" aria-label="${esc('On call ' + fmtDate(d.iso))}"></td>
+      <td class="num">${d.need}</td><td class="flags">${flags}</td>
+      <td>${iss.map(x => `<span class="iss ${x[0]}">${x[0] === 'err' ? '● ' : '▲ '}${esc(x[1])}</span>`).join('')}</td>
+    </tr>`;
+  }).join('');
+  html += `<div class="card"><div class="scroll" style="border:none"><table class="data">
+    <thead><tr><th>Date</th><th>Day</th><th>On Call</th><th class="num">Needed</th><th>Flags</th><th>Checks</th></tr></thead>
+    <tbody>${rows}</tbody></table></div></div>`;
+  const tally = an.pr.P.map((p, i) => {
+    const s = an.stats[i];
+    return `<tr><td>${esc(p.name)}</td><td>${p.senior ? 'Senior' : 'Junior'}${p.dh ? ' · DH' : ''}</td><td class="num">${an.pr.availAll[i]}</td><td class="num">${fmtU(s.U)}</td><td class="num">${s.FRI}</td><td class="num">${s.WD}</td><td class="num">${s.TOT}</td></tr>`;
+  }).join('');
+  html += `<div class="card"><h2>Tally</h2>
+    <p class="hint">Weekends count Saturday and Sunday as ½ each. “Own Fridays” are Fridays before the person’s own weekend and belong to that weekend; any other Friday counts as a weekday.</p>
+    <table class="data"><thead><tr><th>Clinician</th><th>Level</th><th class="num">Days available</th><th class="num">Weekends</th><th class="num">Own Fridays</th><th class="num">Weekdays</th><th class="num">Total days</th></tr></thead><tbody>${tally}</tbody></table></div>`;
+  return html;
+}
+
+function helpHtml() {
+  return `<div class="card help">
+    <h2>How it works</h2>
+    <h3>Each month</h3>
+    <ol>
+      <li><b>Team:</b> add people who joined, remove people who left, and set each person’s level and whether they can take DH call.</li>
+      <li><b>Availability:</b> use the arrows at the top to pick the month. Import it from your spreadsheet (a CSV, or copy and paste from Excel), or click the grid. Tick the MGH, BWH and DH flags on the weekends that need them. Use ★ for anyone who must be on a particular day, and change “People needed” for one-off days such as a holiday.</li>
+      <li><b>Schedule:</b> click Build. Fix anything marked ●, and look over anything marked ▲. Type changes straight into the On Call cells, or change availability and build again.</li>
+      <li><b>Export:</b> Download CSV, which opens in Excel with the same columns as the original sheet, or use Copy for Excel and paste into cell A1.</li>
+      <li><b>Save data file</b> to keep a backup, or to hand everything to someone else.</li>
+    </ol>
+    <h3>Rules it always follows</h3>
+    <ul>
+      <li>Saturday and Sunday: one person, plus one for each flagged site (MGH, BWH, DH), with the same crew both days unless availability forces a split.</li>
+      <li>Monday to Friday: two people. Friday goes to two of that weekend’s crew where they’re available; a one-person weekend gets a second person on Friday.</li>
+      <li>A DH weekend includes someone DH-eligible. A weekend with both MGH and BWH includes a senior.</li>
+      <li>Only people marked available are scheduled, and everyone marked ★ is kept.</li>
+    </ul>
+    <h3>What it balances, most important first</h3>
+    <ol>
+      <li>No one on call two days in a row, except Friday into their own weekend. It checks the end of last month too.</li>
+      <li>Weekends spread evenly, no more than two each, and back-to-back weekends avoided.</li>
+      <li>A senior paired with a junior whenever both are available.</li>
+      <li>Weekday calls spread evenly and no more than two a week. Seniors are compared with seniors and juniors with juniors.</li>
+      <li>Someone on an upcoming weekend gets their weekday early that week, ideally Monday, and calls are spaced as far apart as possible.</li>
+      <li>Last month counts a little, so whoever carried more then gets slightly less now.</li>
+    </ol>
+    <p class="hint">Targets scale with availability, so someone away for part of the month isn’t asked to make up the difference. Each build is a fresh attempt, so “Build a new version” gives you another fair option to compare.</p>
+    <h3>Using it outside Claude</h3>
+    <p>The whole program is one HTML file with no other files or internet access needed. Save it as <code>index.html</code> and open it in any web browser, or keep it in a GitHub repository. Outside Claude it can’t save automatically, so use “Save data file” before closing and “Load data file” next time.</p>
+  </div>`;
+}
+
+function render() {
+  const a = document.activeElement;
+  let sel = null;
+  if (a && a.dataset && a.dataset.act && (a.tagName === 'INPUT' || a.tagName === 'SELECT') && a.type !== 'file') {
+    sel = `[data-act="${a.dataset.act}"]` + (a.dataset.iso ? `[data-iso="${a.dataset.iso}"]` : '') + (a.dataset.id ? `[data-id="${cssEsc(a.dataset.id)}"]` : '') + (a.dataset.k ? `[data-k="${a.dataset.k}"]` : '');
+  }
+  const sc = document.querySelector('.scroll'), sx = sc ? sc.scrollLeft : 0, sy = window.scrollY;
+  const view = ui.tab === 'team' ? teamHtml() : ui.tab === 'schedule' ? scheduleHtml() : ui.tab === 'help' ? helpHtml() : availabilityHtml();
+  document.getElementById('app').innerHTML = headerHtml() + `<main>${view}</main>`;
+  const sc2 = document.querySelector('.scroll');
+  if (sc2) sc2.scrollLeft = sx;
+  window.scrollTo(0, sy);
+  if (sel) { try { const el = document.querySelector(sel); if (el) el.focus(); } catch (e) { /* ignore */ } }
+}
+
+/* ================= Actions ================= */
+function flash(msg, type) { ui.msg = msg; ui.msgType = type || ''; render(); }
+
+function persist() {
+  ui.unsaved = true;
+  if (ui.storage !== 'claude') return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { await window.storage.set(STORE_KEY, JSON.stringify(data), false); ui.storageError = false; }
+    catch (e) { ui.storageError = true; }
+    const s = document.querySelector('.status'); if (s) s.textContent = statusText();
+  }, 400);
+}
+
+function downloadText(text, name, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = name;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+function validName(name, selfId) {
+  if (!name) return 'Enter a name.';
+  if (/[,;]/.test(name)) return 'Names can’t contain commas or semicolons.';
+  const c = byName(name);
+  if (c && c.id !== selfId) return `There’s already someone called ${c.name}.`;
+  return null;
+}
+
+function addClinician() {
+  const nameEl = document.getElementById('new-name');
+  const name = (nameEl ? nameEl.value : '').trim();
+  const err = validName(name, null);
+  if (err) { flash(err, 'err'); return; }
+  const level = document.getElementById('new-level').value;
+  const dh = document.getElementById('new-dh').checked;
+  data.team.push({ id: uid(), name, level, dh });
+  persist();
+  flash(`Added ${name}. They start as available every day; update their availability on the Availability tab.`);
+}
+
+function renameClinician(id, raw) {
+  const c = data.team.find(x => x.id === id);
+  if (!c) return;
+  const name = String(raw).trim();
+  if (name === c.name) return;
+  const err = validName(name, id);
+  if (err) { flash(err, 'err'); return; }
+  const old = c.name.trim().toLowerCase();
+  c.name = name;
+  for (const k in data.months) {
+    const s = data.months[k].schedule;
+    if (!s) continue;
+    for (const iso in s) s[iso] = s[iso].map(nm => (String(nm).trim().toLowerCase() === old ? name : nm));
+  }
+  persist();
+  flash(`Renamed to ${name}.`);
+}
+
+function removeClinician(id) {
+  const c = data.team.find(x => x.id === id);
+  if (!c) return;
+  data.team = data.team.filter(x => x.id !== id);
+  for (const k in data.months) delete data.months[k].cells[id];
+  ui.pendingRemove = null;
+  persist();
+  flash(`Removed ${c.name}. Schedules already built still show their name.`);
+}
+
+function doImport(text) {
+  try {
+    const res = importRows(parseDelimited(text));
+    ui.key = res.key; data.current = res.key; ui.showPaste = false; ui.tab = 'availability';
+    let msg = `Imported ${res.used} days for ${keyLabel(res.key)}.`;
+    if (res.added.length) msg += ` Added to the team: ${res.added.join(', ')}. Set their level and DH eligibility on the Team tab.`;
+    if (res.skipped) msg += ` Skipped ${res.skipped} row(s) outside this month’s dates.`;
+    persist();
+    flash(msg);
+  } catch (e) { flash(e && e.message ? e.message : 'Couldn’t import that.', 'err'); }
+}
+
+function saveDataFile() {
+  try {
+    downloadText(JSON.stringify(data, null, 1), `call-schedule-data-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    ui.unsaved = false;
+    flash('Data file saved. Keep it somewhere safe; “Load data file” brings everything back.');
+  } catch (e) { flash('Download was blocked here. Try again from a regular browser window.', 'err'); }
+}
+
+function loadDataFile(file) {
+  file.text().then(t => {
+    data = normalize(JSON.parse(t));
+    ui.key = data.current || ui.key;
+    persist(); ui.unsaved = false;
+    flash('Data file loaded.');
+  }).catch(() => flash('That file isn’t a Call Schedule Builder data file.', 'err'));
+}
+
+function downloadCsv() {
+  const csv = exportRows(ui.key).map(r => r.map(csvCell).join(',')).join('\r\n');
+  try { downloadText('\uFEFF' + csv, `Call schedule - ${keyLabel(ui.key)}.csv`, 'text/csv;charset=utf-8'); flash('CSV downloaded. It opens directly in Excel.'); }
+  catch (e) { flash('Download was blocked here. Use “Copy for Excel” instead.', 'err'); }
+}
+
+async function copyExcel() {
+  const ok = await copyText(exportRows(ui.key).map(r => r.join('\t')).join('\n'));
+  flash(ok ? 'Copied. Click cell A1 in Excel and paste.' : 'Couldn’t copy automatically here. Use Download CSV instead.', ok ? '' : 'err');
+}
+
+function startBuild() {
+  if (ui.building) return;
+  if (!data.team.length) { flash('Add clinicians on the Team tab first.', 'err'); return; }
+  const key = ui.key, pr = buildProblem(key), t0 = Date.now();
+  ui.building = true; ui.progress = 0; ui.pendingClear = false;
+  render();
+  solve(pr, { restarts: 8, iters: 9000, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 },
+    p => { ui.progress = p; const el = document.getElementById('build-bar'); if (el) el.style.width = Math.round(p * 100) + '%'; },
+    best => {
+      const rec = getMonth(key);
+      rec.schedule = {};
+      pr.D.forEach((d, di) => { rec.schedule[d.iso] = best[di].slice().sort((a, b) => a - b).map(i => pr.P[i].name); });
+      rec.builtAt = new Date().toISOString();
+      ui.building = false;
+      persist();
+      flash(`Built ${keyLabel(key)} in ${((Date.now() - t0) / 1000).toFixed(1)} seconds. Review anything flagged below.`);
+    });
+}
+
+/* ================= Events ================= */
+document.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  switch (act) {
+    case 'month': ui.key = shiftKey(ui.key, Number(el.dataset.d)); data.current = ui.key; ui.pendingReset = false; ui.pendingClear = false; ui.msg = ''; persist(); render(); break;
+    case 'tab': ui.tab = el.dataset.tab; ui.msg = ''; render(); break;
+    case 'dismiss': ui.msg = ''; render(); break;
+    case 'save-file': saveDataFile(); break;
+    case 'team-add': addClinician(); break;
+    case 'team-remove': ui.pendingRemove = id; render(); break;
+    case 'team-remove-cancel': ui.pendingRemove = null; render(); break;
+    case 'team-remove-confirm': removeClinician(id); break;
+    case 'cell': {
+      const rec = getMonth(ui.key), iso = el.dataset.iso;
+      setCell(rec, id, iso, NEXT_STATE[cellState(rec, id, iso)]);
+      persist(); render(); break;
+    }
+    case 'row-all': {
+      const rec = getMonth(ui.key), st = el.dataset.st;
+      for (const iso of monthDays(ui.key)) { if (st === 'A' && cellState(rec, id, iso) === 'F') continue; setCell(rec, id, iso, st); }
+      persist(); render(); break;
+    }
+    case 'toggle-paste': ui.showPaste = !ui.showPaste; render(); break;
+    case 'import-paste': { const box = document.getElementById('paste-box'); doImport(box ? box.value : ''); break; }
+    case 'reset-avail': ui.pendingReset = true; render(); break;
+    case 'reset-avail-cancel': ui.pendingReset = false; render(); break;
+    case 'reset-avail-confirm': getMonth(ui.key).cells = {}; ui.pendingReset = false; persist(); render(); break;
+    case 'build': startBuild(); break;
+    case 'download-csv': downloadCsv(); break;
+    case 'copy-excel': copyExcel(); break;
+    case 'clear-sched': ui.pendingClear = true; render(); break;
+    case 'clear-sched-cancel': ui.pendingClear = false; render(); break;
+    case 'clear-sched-confirm': { const rec = getMonth(ui.key); rec.schedule = null; rec.builtAt = null; ui.pendingClear = false; persist(); render(); break; }
+    default: break;
+  }
+});
+
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  const act = el && el.dataset ? el.dataset.act : null;
+  if (!act) return;
+  const id = el.dataset.id;
+  switch (act) {
+    case 'load-file': { const f = el.files && el.files[0]; el.value = ''; if (f) loadDataFile(f); break; }
+    case 'import-file': { const f = el.files && el.files[0]; el.value = ''; if (f) f.text().then(doImport).catch(() => flash('Couldn’t read that file.', 'err')); break; }
+    case 'team-name': renameClinician(id, el.value); break;
+    case 'team-level': { const c = data.team.find(x => x.id === id); if (c) { c.level = el.value === 'Senior' ? 'Senior' : 'Junior'; persist(); render(); } break; }
+    case 'team-dh': { const c = data.team.find(x => x.id === id); if (c) { c.dh = el.checked; persist(); render(); } break; }
+    case 'flag': {
+      const rec = getMonth(ui.key), iso = el.dataset.iso, k = el.dataset.k;
+      const f = flagText(rec, iso);
+      f[k] = el.checked ? FLAG_LABEL[k] : '';
+      rec.flags[iso] = f;
+      persist(); render(); break;
+    }
+    case 'need': {
+      const rec = getMonth(ui.key), iso = el.dataset.iso, v = parseInt(el.value, 10);
+      if (isNaN(v) || v === defaultNeed(rec, iso)) delete rec.need[iso]; else rec.need[iso] = Math.max(0, Math.min(9, v));
+      persist(); render(); break;
+    }
+    case 'oncall': {
+      const rec = getMonth(ui.key);
+      if (!rec.schedule) rec.schedule = {};
+      rec.schedule[el.dataset.iso] = splitNames(el.value).map(nm => { const c = byName(nm); return c ? c.name : nm; });
+      persist(); render(); break;
+    }
+    default: break;
+  }
+});
+
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target && ev.target.id === 'new-name') { ev.preventDefault(); addClinician(); }
+});
+
+/* ================= Start ================= */
+function hasStore() { return typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function'; }
+
+(async function init() {
+  ui.storage = hasStore() ? 'claude' : 'file';
+  let loaded = null;
+  if (ui.storage === 'claude') {
+    try { const r = await window.storage.get(STORE_KEY, false); if (r && r.value) loaded = normalize(JSON.parse(r.value)); }
+    catch (e) { loaded = null; }
+  }
+  data = loaded || seedData();
+  ui.key = data.current || '2026-11';
+  ui.tab = getMonth(ui.key).schedule ? 'schedule' : 'availability';
+  render();
+  if (!loaded) persist();
+  ui.unsaved = false;
+  if (ui.storage !== 'claude') { const s = document.querySelector('.status'); if (s) s.textContent = statusText(); }
+})();
+</script>
+</body>
+</html>
