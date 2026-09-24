@@ -106,7 +106,7 @@ const W = {
   friCrew: 300,  // Friday not covered by that weekend's crew
   week: 300,     // more than two weekday calls in one week (per extra call)
   split: 150,    // weekend split between different people (per person)
-  pair: 120,     // no senior-junior pair when both were available
+  pair: 10,      // tie-breaker only: on a weekday, mix a senior and a junior when nothing else is lost (0 turns it off)
   wkFair: 150,   // uneven weekends
   wdFair: 30,    // uneven weekdays (seniors vs seniors, juniors vs juniors)
   totFair: 25,   // uneven total days
@@ -453,7 +453,8 @@ function cost(pr, A) {
     for (const p of a) { const q = P[p]; if (q.senior) sen = true; else jun = true; if (q.dh) dh = true; L[p].push(d); }
     if (d.needSenior && !sen) c += W.hard;
     if (d.needDH && !dh) c += W.hard;
-    if (a.length >= 2) { if (!jun && d.anyJun) c += W.pair; if (!sen && d.anySen) c += W.pair; }
+    // Any mix of seniors and juniors is allowed; this is only a small weekday preference
+    if (W.pair && a.length >= 2 && d.w !== 0 && d.w !== 6 && !(sen && jun) && d.anySen && d.anyJun) c += W.pair;
   }
   for (const g of pr.weekends) {
     const sA = g.sat != null ? A[g.sat] : null, uA = g.sun != null ? A[g.sun] : null;
@@ -710,8 +711,7 @@ function analyze(key) {
     const sen = a.some(p => pr.P[p].senior), jun = a.some(p => !pr.P[p].senior), dh = a.some(p => pr.P[p].dh);
     if (d.needSenior && !sen) I.push(['err', 'MGH and BWH day needs a senior']);
     if (d.needDH && !dh) I.push(['err', dhNames.length ? `DH day needs one of ${dhNames.join(', ')}` : 'DH day needs someone DH-eligible (set this on the Team tab)']);
-    if (a.length >= 2 && !jun && d.anyJun) I.push(['warn', 'No junior, though one was available']);
-    if (a.length >= 2 && !sen && d.anySen) I.push(['warn', 'No senior, though one was available']);
+    // Seniors and juniors can work in any mix (a junior alone, two juniors, all seniors), so there is no pairing check.
   });
   for (const g of pr.weekends) {
     if (g.fri == null) continue;
@@ -896,16 +896,17 @@ function helpHtml() {
       <li>Saturday and Sunday: one person, plus one for each flagged site (MGH, BWH, DH), with the same crew both days unless availability forces a split.</li>
       <li>Monday to Friday: two people. Friday goes to two of that weekend’s crew where they’re available; a one-person weekend gets a second person on Friday.</li>
       <li>A DH weekend includes someone DH-eligible. A weekend with both MGH and BWH includes a senior.</li>
+      <li>Otherwise seniors and juniors can work in any mix: a junior alone, two juniors together, or a crew of only seniors.</li>
       <li>Only people marked available are scheduled, and everyone marked ★ is kept.</li>
     </ul>
     <h3>What it balances, most important first</h3>
     <ol>
       <li>No one on call two days in a row, except Friday into their own weekend. It checks the end of last month too.</li>
       <li>Weekends spread evenly, no more than two each, and back-to-back weekends avoided.</li>
-      <li>A senior paired with a junior whenever both are available.</li>
-      <li>Weekday calls spread evenly and no more than two a week. Seniors are compared with seniors and juniors with juniors.</li>
+      <li>Weekday calls spread evenly and no more than two a week. Seniors are compared with seniors and juniors with juniors, and total days are evened out across everyone.</li>
       <li>Someone on an upcoming weekend gets their weekday early that week, ideally Monday, and calls are spaced as far apart as possible.</li>
       <li>Last month counts a little, so whoever carried more then gets slightly less now.</li>
+      <li>Only when nothing else is affected, a weekday mixes a senior and a junior.</li>
     </ol>
     <p class="hint">Targets scale with availability, so someone away for part of the month isn’t asked to make up the difference. Each build is a fresh attempt, so “Build a new version” gives you another fair option to compare.</p>
     <h3>Using it outside Claude</h3>
