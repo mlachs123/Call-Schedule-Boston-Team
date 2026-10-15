@@ -170,16 +170,16 @@ const cssEsc = v => (window.CSS && CSS.escape ? CSS.escape(v) : v);
 /* ================= Starting data (team + October 2026) ================= */
 const SAMPLE_TEAM = [
   ['Mitch', 'Senior', true], ['Mitali', 'Senior', false], ['Mike', 'Senior', false], ['Jamie', 'Senior', true], ['Andreea', 'Senior', true],
-  ['Trinh', 'Junior', false], ['Aubrey', 'Junior', false], ['Robbie', 'Junior', false], ['Jacob', 'Junior', false]
+  ['Nick', 'Junior', false], ['Aubrey', 'Junior', false], ['Robbie', 'Junior', false], ['Jacob', 'Junior', false]
 ];
 const SAMPLE_OCT = [
   ['Date', 'Day', 'On Call', 'On Call BASELINES', 'MGH Call', 'BWH Call', 'DH CALL'],
-  ['10/1/2026', 'Thursday', '', 'Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
-  ['10/2/2026', 'Friday', 'Trinh, Mike', 'Jamie, Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
-  ['10/3/2026', 'Saturday', 'Trinh', 'Mitali, Jamie, Trinh, Mike, Jacob, Robbie, Aubrey', '', '', ''],
-  ['10/4/2026', 'Sunday', 'Mitali', 'Mitali, Jamie, Trinh, Mike, Jacob, Robbie, Aubrey', '', '', ''],
-  ['10/5/2026', 'Monday', '', 'Mitali, Jamie, Trinh, Andreea, Mike, Jacob, Aubrey', '', '', ''],
-  ['10/6/2026', 'Tuesday', '', 'Mitali, Jamie, Trinh, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/1/2026', 'Thursday', '', 'Nick, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/2/2026', 'Friday', 'Nick, Mike', 'Jamie, Nick, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/3/2026', 'Saturday', 'Nick', 'Mitali, Jamie, Nick, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/4/2026', 'Sunday', 'Mitali', 'Mitali, Jamie, Nick, Mike, Jacob, Robbie, Aubrey', '', '', ''],
+  ['10/5/2026', 'Monday', '', 'Mitali, Jamie, Nick, Andreea, Mike, Jacob, Aubrey', '', '', ''],
+  ['10/6/2026', 'Tuesday', '', 'Mitali, Jamie, Nick, Andreea, Mike, Jacob, Robbie, Aubrey', '', '', ''],
   ['10/7/2026', 'Wednesday', '', 'Mitali, Jamie, Andreea, Jacob, Robbie, Aubrey', '', '', ''],
   ['10/8/2026', 'Thursday', '', 'Mitali, Jamie, Andreea, Mike, Jacob, Robbie, Mitch, Aubrey', '', '', ''],
   ['10/9/2026', 'Friday', '', 'Mitali, Jamie, Andreea, Mike, Mitch', 'MGH Call', '', ''],
@@ -208,7 +208,7 @@ const SAMPLE_OCT = [
   ['11/1/2026', 'Sunday', '', 'Mitali, Andreea, Mike, Jacob, Robbie, Mitch', 'MGH Call', '', '']
 ];
 const SAMPLE_OCT_SCHEDULE = [
-  'Andreea, Robbie', 'Trinh, Mike', 'Trinh', 'Mitali', 'Jamie, Jacob', 'Mike, Trinh', 'Mitali, Aubrey', 'Andreea, Robbie',
+  'Andreea, Robbie', 'Nick, Mike', 'Nick', 'Mitali', 'Jamie, Jacob', 'Mike, Nick', 'Mitali, Aubrey', 'Andreea, Robbie',
   'Mitali, Mitch', 'Mitali, Jamie, Mike', 'Mitch, Jamie, Mike', 'Andreea, Aubrey', 'Jamie, Jacob', 'Mitch, Robbie', 'Mitali, Aubrey', 'Andreea, Jacob',
   'Andreea, Jamie, Mitch, Jacob', 'Andreea, Jamie, Mitch, Jacob', 'Mitali, Aubrey', 'Mitch, Robbie', 'Jamie, Jacob', 'Mike, Robbie', 'Aubrey, Andreea', 'Aubrey',
   'Aubrey', 'Mitali, Jacob', 'Mitch, Robbie', 'Mitali, Aubrey', 'Andreea, Jacob', 'Mike, Robbie', 'Mike, Robbie', 'Mike, Robbie'
