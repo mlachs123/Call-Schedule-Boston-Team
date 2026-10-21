@@ -45,6 +45,7 @@ input.oncall{width:100%;min-width:220px}
 .add-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
 .chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+.wrap{overflow-x:auto}
 .grid th,.grid td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:0;text-align:center;font-size:12px}
 .grid .name{position:sticky;left:0;z-index:1;background:#fff;text-align:left;padding:4px 8px;white-space:nowrap;min-width:230px}
 .grid th.day{padding:4px 2px;min-width:36px;font-weight:600;line-height:1.2;background:#f9fafb}
@@ -367,21 +368,47 @@ function contextFor(key, P, startNum) {
   return out;
 }
 
+// Last month's load measured against last month's fair share (share scales with the days
+// each person was available then). Positive = did more than their share, negative = less.
+// Someone who was away, or who wasn't on the team yet, is not counted as owing anything.
 function historyFor(key, P) {
   const prevKey = shiftKey(key, -1), rec = data.months[prevKey];
-  const hU = P.map(() => 0), hWD = P.map(() => 0), hT = P.map(() => 0);
+  const zeros = () => P.map(() => 0);
+  const hU = zeros(), hWD = zeros(), hT = zeros();
   if (!rec || !rec.schedule) return { hU, hWD, hT, has: false };
-  const map = nameIndex(P);
+  const map = nameIndex(P), days = monthDays(prevKey);
   const sets = P.map(() => new Set());
-  for (const iso of monthDays(prevKey)) for (const nm of (rec.schedule[iso] || [])) { const i = map.get(String(nm).trim().toLowerCase()); if (i != null) sets[i].add(isoToNum(iso)); }
+  for (const iso of days) for (const nm of (rec.schedule[iso] || [])) { const i = map.get(String(nm).trim().toLowerCase()); if (i != null) sets[i].add(isoToNum(iso)); }
+  const U = zeros(), WD = zeros(), T = zeros(), aWk = zeros(), aWd = zeros(), aAll = zeros();
   sets.forEach((s, i) => {
     for (const num of s) {
       const w = new Date(num * DAY_MS).getUTCDay();
-      hT[i]++;
-      if (w === 0 || w === 6) hU[i] += 0.5;
-      else if (!(w === 5 && (s.has(num + 1) || s.has(num + 2)))) hWD[i]++;
+      T[i]++;
+      if (w === 0 || w === 6) U[i] += 0.5;
+      else if (!(w === 5 && (s.has(num + 1) || s.has(num + 2)))) WD[i]++;
     }
   });
+  // Only people who were part of last month: scheduled then, or on that month's availability grid
+  const was = P.map((p, i) => sets[i].size > 0 || !!(rec.cells && rec.cells[p.id]));
+  P.forEach((p, i) => {
+    for (const iso of days) {
+      if (cellState(rec, p.id, iso) === 'U') continue;
+      const w = dowOf(iso);
+      aAll[i]++;
+      if (w === 0 || w === 6) aWk[i]++; else aWd[i]++;
+    }
+  });
+  const owed = (vals, avail, idxs, out) => {
+    idxs = idxs.filter(i => was[i]);
+    let sv = 0, sa = 0;
+    for (const i of idxs) { sv += vals[i]; sa += avail[i]; }
+    for (const i of idxs) out[i] = vals[i] - (sa ? sv * avail[i] / sa : 0);
+  };
+  const all = P.map(p => p.idx);
+  owed(U, aWk, all, hU);
+  owed(WD, aWd, P.filter(p => p.senior).map(p => p.idx), hWD);
+  owed(WD, aWd, P.filter(p => !p.senior).map(p => p.idx), hWD);
+  owed(T, aAll, all, hT);
   return { hU, hWD, hT, has: true };
 }
 
@@ -429,18 +456,25 @@ function buildProblem(key) {
   };
 }
 
-// Spread of a load compared with each person's share of availability
-function fair(vals, hist, avail, idxs, h) {
+// Spread of a load compared with each person's share of this month's total
+// (share scales with days available), nudged by what they were over or under last month.
+function fair(vals, owed, avail, idxs, h) {
   let sv = 0, sa = 0;
-  for (const i of idxs) { sv += vals[i] + h * hist[i]; sa += avail[i]; }
+  for (const i of idxs) { sv += vals[i]; sa += avail[i]; }
   if (!sa) return 0;
   let s = 0;
-  for (const i of idxs) { const d = vals[i] + h * hist[i] - sv * avail[i] / sa; s += d * d; }
+  for (const i of idxs) {
+    if (!avail[i]) continue;
+    const d = vals[i] - sv * avail[i] / sa + h * owed[i];
+    s += d * d;
+  }
   return s;
 }
 
-// Total penalty for a full or partial assignment A (A[dayIndex] = list of person indexes)
-function cost(pr, A) {
+// Total penalty for a full or partial assignment A (A[dayIndex] = list of person indexes).
+// This is the readable reference version; the builder uses makeEvaluator(), which gives the
+// same number much faster.
+function costRef(pr, A) {
   const { P, D } = pr, n = P.length;
   let c = 0;
   const L = [];
@@ -516,6 +550,125 @@ function cost(pr, A) {
   return c;
 }
 
+// Same rules and numbers as costRef, with everything that doesn't change during a build
+// worked out once up front and no memory allocated per call. Roughly 10x faster, which
+// lets the builder try far more changes in the same time.
+function makeEvaluator(pr) {
+  const { P, D, ctx } = pr, n = P.length, nD = D.length;
+  const isWk = w => w === 0 || w === 6;
+  const satIx = new Map(), weekIx = new Map();
+  const ix = (m, k) => { if (!m.has(k)) m.set(k, m.size); return m.get(k); };
+  for (const e of ctx) if (isWk(e.w)) ix(satIx, e.sat);
+  for (const d of D) { if (d.sat != null) ix(satIx, d.sat); if (!isWk(d.w)) { ix(satIx, d.week + 5); ix(weekIx, d.week); } }
+  if (satIx.size > 30) return A => costRef(pr, A); // never expected; keeps bit masks safe
+  const bitOf = s => (satIx.has(s) ? 1 << satIx.get(s) : 0);
+  const nSat = satIx.size, nWeek = Math.max(1, weekIx.size);
+  const prev7 = new Int32Array(nSat);
+  for (const [s, j] of satIx) prev7[j] = bitOf(s - 7);
+
+  const cx = ctx.map(e => ({ num: e.num, sat: e.sat == null ? NaN : e.sat, bit: isWk(e.w) ? bitOf(e.sat) : 0, persons: e.persons }));
+  const dNum = new Float64Array(nD), dSat = new Float64Array(nD), dBit = new Int32Array(nD), dLateBit = new Int32Array(nD);
+  const dWkd = new Uint8Array(nD), dFri = new Uint8Array(nD), dWeek = new Int32Array(nD), dNeed = new Int32Array(nD);
+  const dSen = new Uint8Array(nD), dDH = new Uint8Array(nD), dPair = new Uint8Array(nD), dLate = new Float64Array(nD);
+  D.forEach((d, di) => {
+    dNum[di] = d.num; dSat[di] = d.sat == null ? NaN : d.sat; dBit[di] = d.sat == null ? 0 : bitOf(d.sat);
+    dWkd[di] = isWk(d.w) ? 1 : 0; dFri[di] = d.w === 5 ? 1 : 0; dNeed[di] = d.need;
+    dSen[di] = d.needSenior ? 1 : 0; dDH[di] = d.needDH ? 1 : 0;
+    dPair[di] = W.pair && !isWk(d.w) && d.anySen && d.anyJun ? 1 : 0;
+    if (!isWk(d.w)) {
+      dWeek[di] = weekIx.get(d.week);
+      dLate[di] = d.w === 2 ? W.tue : d.w === 3 || d.w === 4 ? W.lateWeek : 0;
+      dLateBit[di] = bitOf(d.week + 5);
+    }
+  });
+  const avMask = di => { const m = new Uint8Array(n); for (const p of D[di].avail) m[p] = 1; return m; };
+  const WK = pr.weekends.map(g => {
+    const o = { sat: g.sat == null ? -1 : g.sat, sun: g.sun == null ? -1 : g.sun, fri: g.fri == null ? -1 : g.fri, prevFri: g.prevFri, friAvail: null, friNeed: 0, wkAvail: null, cap: 0 };
+    if (g.fri != null) { o.friAvail = avMask(g.fri); o.friNeed = D[g.fri].need; }
+    else if (g.prevFri) {
+      o.wkAvail = new Uint8Array(n);
+      for (const di of [g.sat, g.sun]) if (di != null) for (const p of D[di].avail) o.wkAvail[p] = 1;
+      o.cap = Math.max(g.sat != null ? D[g.sat].need : 0, g.sun != null ? D[g.sun].need : 0);
+    }
+    return o;
+  });
+  const senior = Uint8Array.from(P, p => (p.senior ? 1 : 0)), dhOK = Uint8Array.from(P, p => (p.dh ? 1 : 0));
+  const wkMask = new Int32Array(n), prevNum = new Float64Array(n), prevSat = new Float64Array(n);
+  const U = new Float64Array(n), WD = new Float64Array(n), TOT = new Float64Array(n), weekCnt = new Uint8Array(n * nWeek);
+  const mark = new Float64Array(n), crew = new Int32Array(n);
+  let stamp = 0;
+
+  return function evaluate(A) {
+    let c = 0;
+    wkMask.fill(0);
+    for (const e of cx) if (e.bit) for (const p of e.persons) wkMask[p] |= e.bit;
+    for (let di = 0; di < nD; di++) if (dWkd[di]) { const b = dBit[di]; for (const p of A[di]) wkMask[p] |= b; }
+    prevNum.fill(NaN); U.fill(0); WD.fill(0); TOT.fill(0); weekCnt.fill(0);
+    for (const e of cx) for (const p of e.persons) {
+      const pn = prevNum[p];
+      if (pn === pn && !(prevSat[p] === e.sat)) { const gap = e.num - pn; c += gap <= 1 ? W.consec : gap === 2 ? W.gap2 : gap === 3 ? W.gap3 : 0; }
+      prevNum[p] = e.num; prevSat[p] = e.sat;
+    }
+    for (let di = 0; di < nD; di++) {
+      const a = A[di], num = dNum[di], sat = dSat[di];
+      if (a.length < dNeed[di]) c += W.hard * (dNeed[di] - a.length);
+      let sen = 0, jun = 0, dh = 0;
+      for (let k = 0; k < a.length; k++) {
+        const p = a[k];
+        if (senior[p]) sen = 1; else jun = 1;
+        if (dhOK[p]) dh = 1;
+        const pn = prevNum[p];
+        if (pn === pn && !(prevSat[p] === sat)) { const gap = num - pn; c += gap <= 1 ? W.consec : gap === 2 ? W.gap2 : gap === 3 ? W.gap3 : 0; }
+        prevNum[p] = num; prevSat[p] = sat;
+        TOT[p]++;
+        if (dWkd[di]) { U[p] += 0.5; continue; }
+        if (dFri[di] && (wkMask[p] & dBit[di])) continue;
+        WD[p]++;
+        if (++weekCnt[p * nWeek + dWeek[di]] > 2) c += W.week;
+        if (dLate[di] && (wkMask[p] & dLateBit[di])) c += dLate[di];
+      }
+      if (dSen[di] && !sen) c += W.hard;
+      if (dDH[di] && !dh) c += W.hard;
+      if (dPair[di] && a.length >= 2 && !(sen && jun)) c += W.pair;
+    }
+    for (const g of WK) {
+      const sA = g.sat >= 0 ? A[g.sat] : null, uA = g.sun >= 0 ? A[g.sun] : null;
+      if (sA && uA) {
+        for (const p of sA) if (!uA.includes(p)) c += W.split;
+        for (const p of uA) if (!sA.includes(p)) c += W.split;
+      }
+      if (!sA && !uA) continue;
+      if (++stamp > 1e15) { mark.fill(0); stamp = 1; }
+      let cn = 0;
+      if (sA) for (const p of sA) if (mark[p] !== stamp) { mark[p] = stamp; crew[cn++] = p; }
+      if (uA) for (const p of uA) if (mark[p] !== stamp) { mark[p] = stamp; crew[cn++] = p; }
+      if (!cn) continue;
+      if (g.fri >= 0) {
+        let elig = 0, act = 0;
+        for (let k = 0; k < cn; k++) if (g.friAvail[crew[k]]) elig++;
+        for (const p of A[g.fri]) if (mark[p] === stamp) act++;
+        const needed = Math.min(g.friNeed, elig);
+        if (act < needed) c += W.friCrew * (needed - act);
+      } else if (g.prevFri) {
+        let elig = 0, act = 0;
+        for (const p of g.prevFri) { if (g.wkAvail[p]) elig++; if (mark[p] === stamp) act++; }
+        const needed = Math.min(elig, g.cap);
+        if (act < needed) c += W.friCrew * (needed - act);
+      }
+    }
+    for (let p = 0; p < n; p++) {
+      const m = wkMask[p];
+      if (m) for (let j = 0; j < nSat; j++) if ((m >> j) & 1 && (m & prev7[j])) c += W.b2b;
+      if (U[p] > 2) c += W.wkOver * (U[p] - 2) * 2;
+    }
+    c += W.wkFair * fair(U, pr.hU, pr.availWk, pr.everyone, pr.h);
+    c += W.wdFair * (fair(WD, pr.hWD, pr.availWd, pr.seniors, pr.h) + fair(WD, pr.hWD, pr.availWd, pr.juniors, pr.h));
+    c += W.totFair * fair(TOT, pr.hT, pr.availAll, pr.everyone, pr.h);
+    return c;
+  };
+}
+function cost(pr, A) { return (pr.ev || (pr.ev = makeEvaluator(pr)))(A); }
+
 /* ---------- Building a first draft ---------- */
 function fillDay(pr, A, di, rng) {
   const d = pr.D[di];
@@ -576,25 +729,76 @@ function moveReplace(pr, A, rng) {
   return saved;
 }
 
-function fullWeekends(pr) { return pr.weekends.filter(g => g.sat != null && g.sun != null); }
+function fullWeekends(pr) { return pr.fullWk || (pr.fullWk = pr.weekends.filter(g => g.sat != null && g.sun != null)); }
+// Days that aren't half of a whole weekend: Monday to Friday, plus a lone Saturday or Sunday at a month edge
+function singleDays(pr) {
+  if (pr.single) return pr.single;
+  const inWk = new Set();
+  for (const g of fullWeekends(pr)) { inWk.add(g.sat); inWk.add(g.sun); }
+  return (pr.single = pr.D.map(d => d.di).filter(di => !inWk.has(di)));
+}
+// Weekend crew members on both days who aren't pinned with ★
+function weekendMovers(pr, A, g) {
+  const sA = A[g.sat], uA = A[g.sun], sD = pr.D[g.sat], uD = pr.D[g.sun];
+  return sA.filter(p => uA.includes(p) && !sD.fixedSet.has(p) && !uD.fixedSet.has(p));
+}
+// People who could take a whole weekend they aren't on
+function weekendCands(pr, A, g) {
+  const sA = A[g.sat], uA = A[g.sun], uD = pr.D[g.sun];
+  return pr.D[g.sat].avail.filter(p => uD.availSet.has(p) && !sA.includes(p) && !uA.includes(p));
+}
+// Friday belongs to that weekend's crew, so whoever takes over someone's weekend also takes
+// over their Friday when they can. Without this, every weekend change stranded a Friday and
+// was rejected, which left most weekend crews stuck as the first draft picked them.
+function carryFriday(pr, A, g, out, inn, saved) {
+  if (g.fri == null) return;
+  const fA = A[g.fri], fD = pr.D[g.fri], i = fA.indexOf(out);
+  if (i < 0 || fD.fixedSet.has(out) || !fD.availSet.has(inn) || fA.includes(inn)) return;
+  saved.push([g.fri, fA.slice()]);
+  fA[i] = inn;
+}
+function swapWeekend(pr, A, g, out, inn, saved) {
+  const sA = A[g.sat], uA = A[g.sun];
+  saved.push([g.sat, sA.slice()], [g.sun, uA.slice()]);
+  sA[sA.indexOf(out)] = inn;
+  uA[uA.indexOf(out)] = inn;
+  carryFriday(pr, A, g, out, inn, saved);
+}
 
 function moveWeekendReplace(pr, A, rng) {
   const gs = fullWeekends(pr);
   if (!gs.length) return null;
-  const g = pick(gs, rng), sA = A[g.sat], uA = A[g.sun], sD = pr.D[g.sat], uD = pr.D[g.sun];
-  const both = sA.filter(p => uA.includes(p) && !sD.fixedSet.has(p) && !uD.fixedSet.has(p));
+  const g = pick(gs, rng), both = weekendMovers(pr, A, g);
   if (!both.length) return null;
-  const cands = sD.avail.filter(p => uD.availSet.has(p) && !sA.includes(p) && !uA.includes(p));
+  const cands = weekendCands(pr, A, g);
+  if (!cands.length) return null;
+  const saved = [];
+  swapWeekend(pr, A, g, pick(both, rng), pick(cands, rng), saved);
+  return saved;
+}
+
+// Trade a weekend for a weekday: someone on a weekend hands it (and its Friday) to
+// someone who gives them one of their weekdays in return.
+function moveTrade(pr, A, rng) {
+  const gs = fullWeekends(pr);
+  if (!gs.length) return null;
+  const g = pick(gs, rng), both = weekendMovers(pr, A, g);
+  if (!both.length) return null;
+  const cands = weekendCands(pr, A, g);
   if (!cands.length) return null;
   const out = pick(both, rng), inn = pick(cands, rng);
-  const saved = [[g.sat, sA.slice()], [g.sun, uA.slice()]];
-  sA[sA.indexOf(out)] = inn;
-  uA[uA.indexOf(out)] = inn;
+  const days = singleDays(pr).filter(di => di !== g.fri && A[di].includes(inn) && !pr.D[di].fixedSet.has(inn) && pr.D[di].availSet.has(out) && !A[di].includes(out));
+  if (!days.length) return null;
+  const di = pick(days, rng), saved = [[di, A[di].slice()]];
+  A[di][A[di].indexOf(inn)] = out;
+  swapWeekend(pr, A, g, out, inn, saved);
   return saved;
 }
 
 function moveSwap(pr, A, rng) {
-  const n = pr.D.length, d1 = Math.floor(rng() * n), d2 = Math.floor(rng() * n);
+  const S = singleDays(pr);
+  if (S.length < 2) return null;
+  const d1 = pick(S, rng), d2 = pick(S, rng);
   if (d1 === d2) return null;
   const a1 = A[d1], a2 = A[d2], D1 = pr.D[d1], D2 = pr.D[d2];
   const m1 = a1.filter(p => !D1.fixedSet.has(p) && D2.availSet.has(p) && !a2.includes(p));
@@ -620,41 +824,109 @@ function moveWeekendSwap(pr, A, rng) {
   const saved = [[g1.sat, A[g1.sat].slice()], [g1.sun, A[g1.sun].slice()], [g2.sat, A[g2.sat].slice()], [g2.sun, A[g2.sun].slice()]];
   for (const di of [g1.sat, g1.sun]) { const a = A[di]; a[a.indexOf(p1)] = p2; }
   for (const di of [g2.sat, g2.sun]) { const a = A[di]; a[a.indexOf(p2)] = p1; }
+  carryFriday(pr, A, g1, p1, p2, saved);
+  carryFriday(pr, A, g2, p2, p1, saved);
   return saved;
 }
 
 function propose(pr, A, rng) {
   const r = rng();
-  if (r < 0.35) return moveReplace(pr, A, rng);
-  if (r < 0.6) return moveWeekendReplace(pr, A, rng);
-  if (r < 0.85) return moveSwap(pr, A, rng);
+  if (r < 0.25) return moveReplace(pr, A, rng);
+  if (r < 0.45) return moveWeekendReplace(pr, A, rng);
+  if (r < 0.75) return moveSwap(pr, A, rng);
+  if (r < 0.88) return moveTrade(pr, A, rng);
   return moveWeekendSwap(pr, A, rng);
 }
 function restore(A, saved) { for (let k = saved.length - 1; k >= 0; k--) { const [di, arr] = saved[k]; A[di] = arr; } }
 
-// Several fresh drafts, each improved by simulated annealing; keeps the best.
-function solve(pr, opts, onProgress, onDone) {
-  const restarts = opts.restarts, iters = opts.iters;
-  let best = null, bestCost = Infinity, r = 0;
-  const step = () => {
-    const rng = mulberry32((opts.seed + r * 7919) >>> 0);
-    const A = greedy(pr, rng);
-    let cur = cost(pr, A), locBest = cur, locA = cloneA(A);
-    const T0 = 300, T1 = 1;
-    for (let it = 0; it < iters; it++) {
-      const T = T0 * Math.pow(T1 / T0, it / iters);
-      const saved = propose(pr, A, rng);
-      if (!saved) continue;
-      const nc = cost(pr, A);
-      if (nc <= cur || rng() < Math.exp((cur - nc) / T)) {
-        cur = nc;
-        if (nc < locBest) { locBest = nc; locA = cloneA(A); }
-      } else restore(A, saved);
+// Final clean-up of a draft: try every single replacement, weekend hand-over, weekday swap
+// and weekend-for-weekday trade, keep any that lowers the penalty, and repeat until none
+// does. The result can't be improved by any one of those changes.
+function polish(pr, A, ev) {
+  let cur = ev(A);
+  const keep = saved => { const c = ev(A); if (c < cur - 1e-9) { cur = c; return true; } restore(A, saved); return false; };
+  const S = singleDays(pr);
+  for (let pass = 0; pass < 8; pass++) {
+    const start = cur;
+    for (let di = 0; di < pr.D.length; di++) {
+      const d = pr.D[di];
+      for (let k = 0; k < A[di].length; k++) {
+        if (d.fixedSet.has(A[di][k])) continue;
+        for (const inn of d.avail) {
+          if (A[di].includes(inn)) continue;
+          const saved = [[di, A[di].slice()]];
+          A[di][k] = inn;
+          if (keep(saved)) break;
+        }
+      }
     }
-    if (locBest < bestCost) { bestCost = locBest; best = locA; }
-    r++;
-    onProgress(r / restarts);
-    if (r < restarts) setTimeout(step, 0); else onDone(best, bestCost);
+    for (const g of fullWeekends(pr)) {
+      for (const out of weekendMovers(pr, A, g)) {
+        for (const inn of weekendCands(pr, A, g)) {
+          if (!A[g.sat].includes(out)) break; // already handed over in this loop
+          const saved = [];
+          swapWeekend(pr, A, g, out, inn, saved);
+          if (keep(saved)) break;
+          for (const di of S) {
+            if (di === g.fri || !A[di].includes(inn) || pr.D[di].fixedSet.has(inn) || !pr.D[di].availSet.has(out) || A[di].includes(out)) continue;
+            const s2 = [[di, A[di].slice()]];
+            A[di][A[di].indexOf(inn)] = out;
+            swapWeekend(pr, A, g, out, inn, s2);
+            if (keep(s2)) break;
+          }
+          if (!A[g.sat].includes(out)) break;
+        }
+      }
+    }
+    for (let x = 0; x < S.length; x++) {
+      for (let y = x + 1; y < S.length; y++) {
+        const d1 = S[x], d2 = S[y], D1 = pr.D[d1], D2 = pr.D[d2];
+        for (let i = 0; i < A[d1].length; i++) {
+          const p1 = A[d1][i];
+          if (D1.fixedSet.has(p1) || !D2.availSet.has(p1) || A[d2].includes(p1)) continue;
+          for (let j = 0; j < A[d2].length; j++) {
+            const p2 = A[d2][j];
+            if (D2.fixedSet.has(p2) || !D1.availSet.has(p2) || A[d1].includes(p2)) continue;
+            const saved = [[d1, A[d1].slice()], [d2, A[d2].slice()]];
+            A[d1][i] = p2; A[d2][j] = p1;
+            if (keep(saved)) break;
+          }
+        }
+      }
+    }
+    if (cur >= start - 1e-9) break;
+  }
+  return cur;
+}
+
+// Several fresh drafts, each improved by simulated annealing and then polished; keeps the best.
+// Works in ~30 ms bursts so the page stays responsive while it builds.
+function solve(pr, opts, onProgress, onDone) {
+  const ev = pr.ev || (pr.ev = makeEvaluator(pr));
+  const R = opts.restarts, I = opts.iters, T0 = 300, lnT = Math.log(1 / T0);
+  let best = null, bestCost = Infinity, r = 0, it = 0, rng = null, A = null, cur = 0, locBest = 0, locA = null;
+  const step = () => {
+    const until = Date.now() + 30;
+    while (Date.now() < until) {
+      if (!A) { rng = mulberry32((opts.seed + r * 7919) >>> 0); A = greedy(pr, rng); cur = ev(A); locBest = cur; locA = cloneA(A); it = 0; }
+      const end = Math.min(I, it + 400);
+      for (; it < end; it++) {
+        const saved = propose(pr, A, rng);
+        if (!saved) continue;
+        const nc = ev(A);
+        if (nc <= cur || rng() < Math.exp((cur - nc) / (T0 * Math.exp(lnT * it / I)))) {
+          cur = nc;
+          if (nc < locBest) { locBest = nc; locA = cloneA(A); }
+        } else restore(A, saved);
+      }
+      if (it < I) continue;
+      const c = polish(pr, locA, ev);
+      if (c < bestCost) { bestCost = c; best = locA; }
+      A = null; r++;
+      if (r >= R) { onProgress(1); onDone(best, bestCost); return; }
+    }
+    onProgress((r * I + it) / (R * I));
+    setTimeout(step, 0);
   };
   setTimeout(step, 20);
 }
@@ -774,7 +1046,7 @@ function teamHtml() {
   return `<div class="card">
     <h2>Team</h2>
     <p class="hint">${data.team.length} clinicians: ${s} senior, ${data.team.length - s} junior, ${dh} DH-eligible. Changes apply to every schedule you build from now on. Schedules already built keep the names they had.</p>
-    <table class="data team"><thead><tr><th>Name</th><th>Level</th><th>DH call</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="hint">No one yet.</td></tr>'}</tbody></table>
+    <div class="wrap"><table class="data team"><thead><tr><th>Name</th><th>Level</th><th>DH call</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="hint">No one yet.</td></tr>'}</tbody></table></div>
     <div class="add-row">
       <input type="text" id="new-name" placeholder="New clinician’s name" aria-label="New clinician’s name">
       <select id="new-level" aria-label="Level"><option>Senior</option><option selected>Junior</option></select>
@@ -876,7 +1148,7 @@ function scheduleHtml() {
   }).join('');
   html += `<div class="card"><h2>Tally</h2>
     <p class="hint">Weekends count Saturday and Sunday as ½ each. “Own Fridays” are Fridays before the person’s own weekend and belong to that weekend; any other Friday counts as a weekday.</p>
-    <table class="data"><thead><tr><th>Clinician</th><th>Level</th><th class="num">Days available</th><th class="num">Weekends</th><th class="num">Own Fridays</th><th class="num">Weekdays</th><th class="num">Total days</th></tr></thead><tbody>${tally}</tbody></table></div>`;
+    <div class="wrap"><table class="data"><thead><tr><th>Clinician</th><th>Level</th><th class="num">Days available</th><th class="num">Weekends</th><th class="num">Own Fridays</th><th class="num">Weekdays</th><th class="num">Total days</th></tr></thead><tbody>${tally}</tbody></table></div></div>`;
   return html;
 }
 
@@ -905,7 +1177,7 @@ function helpHtml() {
       <li>Weekends spread evenly, no more than two each, and back-to-back weekends avoided.</li>
       <li>Weekday calls spread evenly and no more than two a week. Seniors are compared with seniors and juniors with juniors, and total days are evened out across everyone.</li>
       <li>Someone on an upcoming weekend gets their weekday early that week, ideally Monday, and calls are spaced as far apart as possible.</li>
-      <li>Last month counts a little, so whoever carried more then gets slightly less now.</li>
+      <li>Last month counts a little: whoever did more than their share then (for the days they were available) gets slightly less now, and whoever did less gets slightly more. Time away and joining partway through don’t count against anyone.</li>
       <li>Only when nothing else is affected, a weekday mixes a senior and a junior.</li>
     </ol>
     <p class="hint">Targets scale with availability, so someone away for part of the month isn’t asked to make up the difference. Each build is a fresh attempt, so “Build a new version” gives you another fair option to compare.</p>
@@ -914,7 +1186,14 @@ function helpHtml() {
   </div>`;
 }
 
+// A text box saves when it loses focus. If that happened because someone pressed on another
+// control, redrawing right away replaces that control before the click lands, so the click
+// is lost (and focus jumps away). Redraws triggered while the pointer is down wait for it.
+let pointerDown = false, renderQueued = false;
+function rerender() { if (pointerDown) renderQueued = true; else render(); }
+
 function render() {
+  renderQueued = false;
   const a = document.activeElement;
   let sel = null;
   if (a && a.dataset && a.dataset.act && (a.tagName === 'INPUT' || a.tagName === 'SELECT') && a.type !== 'file') {
@@ -930,7 +1209,7 @@ function render() {
 }
 
 /* ================= Actions ================= */
-function flash(msg, type) { ui.msg = msg; ui.msgType = type || ''; render(); }
+function flash(msg, type) { ui.msg = msg; ui.msgType = type || ''; rerender(); }
 
 function persist() {
   ui.unsaved = true;
@@ -1025,9 +1304,11 @@ function doImport(text) {
   } catch (e) { flash(e && e.message ? e.message : 'Couldn’t import that.', 'err'); }
 }
 
+function localIsoToday() { const t = new Date(); return mkIso(t.getFullYear(), t.getMonth() + 1, t.getDate()); }
+
 function saveDataFile() {
   try {
-    downloadText(JSON.stringify(data, null, 1), `call-schedule-data-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    downloadText(JSON.stringify(data, null, 1), `call-schedule-data-${localIsoToday()}.json`, 'application/json');
     ui.unsaved = false;
     flash('Data file saved. Keep it somewhere safe; “Load data file” brings everything back.');
   } catch (e) { flash('Download was blocked here. Try again from a regular browser window.', 'err'); }
@@ -1057,9 +1338,12 @@ function startBuild() {
   if (ui.building) return;
   if (!data.team.length) { flash('Add clinicians on the Team tab first.', 'err'); return; }
   const key = ui.key, pr = buildProblem(key), t0 = Date.now();
+  // What the build is based on; edits made while it runs aren't included in it
+  const inputs = () => { const r = getMonth(key); return JSON.stringify([data.team, r.cells, r.flags, r.need]); };
+  const before = inputs();
   ui.building = true; ui.progress = 0; ui.pendingClear = false;
   render();
-  solve(pr, { restarts: 8, iters: 9000, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 },
+  solve(pr, { restarts: 8, iters: 25000, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 },
     p => { ui.progress = p; const el = document.getElementById('build-bar'); if (el) el.style.width = Math.round(p * 100) + '%'; },
     best => {
       const rec = getMonth(key);
@@ -1068,7 +1352,9 @@ function startBuild() {
       rec.builtAt = new Date().toISOString();
       ui.building = false;
       persist();
-      flash(`Built ${keyLabel(key)} in ${((Date.now() - t0) / 1000).toFixed(1)} seconds. Review anything flagged below.`);
+      const changed = inputs() !== before;
+      flash(`Built ${keyLabel(key)} in ${((Date.now() - t0) / 1000).toFixed(1)} seconds. ` +
+        (changed ? 'Availability, flags or the team changed while it was building, so build again to include those changes.' : 'Review anything flagged below.'), changed ? 'err' : '');
     });
 }
 
@@ -1120,25 +1406,25 @@ document.addEventListener('change', ev => {
     case 'load-file': { const f = el.files && el.files[0]; el.value = ''; if (f) loadDataFile(f); break; }
     case 'import-file': { const f = el.files && el.files[0]; el.value = ''; if (f) f.text().then(doImport).catch(() => flash('Couldn’t read that file.', 'err')); break; }
     case 'team-name': renameClinician(id, el.value); break;
-    case 'team-level': { const c = data.team.find(x => x.id === id); if (c) { c.level = el.value === 'Senior' ? 'Senior' : 'Junior'; persist(); render(); } break; }
-    case 'team-dh': { const c = data.team.find(x => x.id === id); if (c) { c.dh = el.checked; persist(); render(); } break; }
+    case 'team-level': { const c = data.team.find(x => x.id === id); if (c) { c.level = el.value === 'Senior' ? 'Senior' : 'Junior'; persist(); rerender(); } break; }
+    case 'team-dh': { const c = data.team.find(x => x.id === id); if (c) { c.dh = el.checked; persist(); rerender(); } break; }
     case 'flag': {
       const rec = getMonth(ui.key), iso = el.dataset.iso, k = el.dataset.k;
       const f = flagText(rec, iso);
       f[k] = el.checked ? FLAG_LABEL[k] : '';
       rec.flags[iso] = f;
-      persist(); render(); break;
+      persist(); rerender(); break;
     }
     case 'need': {
       const rec = getMonth(ui.key), iso = el.dataset.iso, v = parseInt(el.value, 10);
       if (isNaN(v) || v === defaultNeed(rec, iso)) delete rec.need[iso]; else rec.need[iso] = Math.max(0, Math.min(9, v));
-      persist(); render(); break;
+      persist(); rerender(); break;
     }
     case 'oncall': {
       const rec = getMonth(ui.key);
       if (!rec.schedule) rec.schedule = {};
       rec.schedule[el.dataset.iso] = splitNames(el.value).map(nm => { const c = byName(nm); return c ? c.name : nm; });
-      persist(); render(); break;
+      persist(); rerender(); break;
     }
     default: break;
   }
@@ -1147,6 +1433,13 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target && ev.target.id === 'new-name') { ev.preventDefault(); addClinician(); }
 });
+
+// See rerender(): hold redraws while a press is in progress, then catch up after its click runs.
+document.addEventListener('pointerdown', () => { pointerDown = true; }, true);
+const releasePointer = () => { pointerDown = false; setTimeout(() => { if (renderQueued) render(); }, 0); };
+document.addEventListener('pointerup', releasePointer, true);
+document.addEventListener('pointercancel', releasePointer, true);
+window.addEventListener('blur', () => { if (pointerDown) releasePointer(); });
 
 /* ================= Start ================= */
 function hasStore() { return typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function'; }
